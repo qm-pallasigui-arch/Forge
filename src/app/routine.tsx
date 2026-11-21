@@ -1,4 +1,4 @@
-import { useState } from "react";
+import WeightControl from "../components/WeightControl";
 import { router } from "expo-router";
 import {
   KeyboardAvoidingView,
@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,43 +14,8 @@ import { type Exercise } from "../shared/fitness";
 import { colors, useFitMap } from "../state/FitMapStore";
 import { Stepper } from "../components/Controls";
 
-function WeightField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const commit = () => {
-    const parsed = Number((draft ?? String(value)).replace(",", "."));
-    if (Number.isFinite(parsed) && parsed >= 0) onChange(parsed);
-    setDraft(null);
-  };
-  return (
-    <View style={s.weightField}>
-      <Text style={s.muted}>{label}</Text>
-      <View style={s.inputRow}>
-        <TextInput
-          value={draft ?? String(value)}
-          onChangeText={setDraft}
-          onBlur={commit}
-          onSubmitEditing={commit}
-          keyboardType="decimal-pad"
-          returnKeyType="done"
-          accessibilityLabel={`${label} in kilograms`}
-          selectTextOnFocus
-          style={s.input}
-        />
-        <Text style={s.muted}>kg</Text>
-      </View>
-    </View>
-  );
-}
 function RoutineCard({ exercise }: { exercise: Exercise }) {
-  const { update, remove, accent } = useFitMap();
+  const { update, remove } = useFitMap();
   return (
     <View style={s.card}>
       <View style={s.cardHeader}>
@@ -80,21 +44,7 @@ function RoutineCard({ exercise }: { exercise: Exercise }) {
           onChange={(reps) => update({ ...exercise, reps })}
         />
       </View>
-      <View style={s.weights}>
-        <WeightField
-          label="Working weight"
-          value={exercise.weight}
-          onChange={(weight) => update({ ...exercise, weight })}
-        />
-        <WeightField
-          label="Next increase"
-          value={exercise.progression}
-          onChange={(progression) => update({ ...exercise, progression })}
-        />
-      </View>
-      <Text style={[s.target, { color: accent }]}>
-        {Number((exercise.weight + exercise.progression).toFixed(2))} kg next target
-      </Text>
+      <WeightControl exercise={exercise} />
     </View>
   );
 }
