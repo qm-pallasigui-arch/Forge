@@ -51,7 +51,7 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <FitMapProvider>
-        <Navigation />
+        <View style={{ flex: 1, width: "100%", maxWidth: 480, alignSelf: "center", backgroundColor: colors.background }}><Navigation /></View>
       </FitMapProvider>
     </SafeAreaProvider>
   );

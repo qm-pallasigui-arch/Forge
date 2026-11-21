@@ -92,7 +92,7 @@ function Figure({
                   : 1
               }
               stroke={selected === id ? accent : "#657184"}
-              strokeWidth={selected === id ? 3 : 1.5}
+              strokeWidth={selected === id ? 3 : mode === "map" ? 2.2 : 1.5}
               strokeLinejoin="round"
               {...(Platform.OS === "web"
                 // The SVG web adapter needs null to preserve the DOM click handler.
@@ -223,4 +223,4 @@ export default function BodyMap(props: Props) {
     </View>
   );
 }
-const styles = StyleSheet.create({ container: { flex: 1, minHeight: 240 } });
+const styles = StyleSheet.create({ container: { flex: 1, minHeight: 180 } });

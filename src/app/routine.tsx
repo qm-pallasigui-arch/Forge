@@ -148,6 +148,7 @@ export default function RoutineScreen() {
             ))}
           </ScrollView>
         )}
+        <Text style={{ color: colors.muted, fontSize: 10, textAlign: "center", padding: 8 }}>For general fitness information only.</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

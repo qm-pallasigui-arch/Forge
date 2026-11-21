@@ -65,7 +65,7 @@ export function Stepper({
 const s = StyleSheet.create({
   choice: {
     paddingHorizontal: 14,
-    minHeight: 42,
+    minHeight: 44,
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 22,
@@ -78,8 +78,8 @@ const s = StyleSheet.create({
   stepper: { gap: 5 },
   row: { flexDirection: "row", alignItems: "center", gap: 6 },
   step: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     borderRadius: 20,
     backgroundColor: colors.raised,
     alignItems: "center",

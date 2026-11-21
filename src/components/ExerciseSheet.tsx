@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Modal,
+  BackHandler,
   Platform,
   Pressable,
   ScrollView,
@@ -10,7 +10,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EXERCISES, SUBPARTS, type Exercise, type ExerciseDef } from "../shared/fitness";
 import { names } from "../shared/body-artwork";
 import { colors, useFitMap, type BodyView } from "../state/FitMapStore";
@@ -62,22 +61,22 @@ export default function ExerciseSheet({
   view: BodyView;
   onClose: () => void;
 }) {
-  const store = useFitMap(),
-    insets = useSafeAreaInsets();
+  const store = useFitMap();
+  useEffect(() => { const listener = BackHandler.addEventListener("hardwareBackPress", () => { onClose(); return true; }); return () => listener.remove(); }, [onClose]);
   const [tab, setTab] = useState<"exercises" | "passport" | "notes">("exercises");
   const [part, setPart] = useState<string | null>(null);
   const key = `${view}:${id}`;
   const exercises = (EXERCISES[id] ?? []).filter((item) => !part || item.parts?.includes(part));
   const saved = store.routine.filter((item) => item.muscle === names[id]);
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <View style={StyleSheet.absoluteFill} testID="exercise-popover">
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={s.modal}>
         <Pressable
           style={StyleSheet.absoluteFill}
           accessibilityLabel="Dismiss muscle details"
           onPress={onClose}
         />
-        <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={s.sheet}>
           <View style={s.handle} />
           <View style={s.header}>
             <View>
@@ -161,13 +160,15 @@ export default function ExerciseSheet({
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </View>
   );
 }
 const s = StyleSheet.create({
   modal: { flex: 1, justifyContent: "flex-end", backgroundColor: "#0008" },
   sheet: {
-    maxHeight: "84%",
+    maxHeight: "100%",
+    flex: 1,
+    paddingBottom: 8,
     backgroundColor: colors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -183,12 +184,12 @@ const s = StyleSheet.create({
     marginTop: 10,
   },
   header: {
-    padding: 20,
+    padding: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  title: { color: colors.text, fontSize: 25, fontWeight: "700", marginTop: 4 },
+  title: { color: colors.text, fontSize: 21, fontWeight: "700", marginTop: 4 },
   eyebrow: { color: colors.muted, fontSize: 10, letterSpacing: 1.4 },
   close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   closeText: { color: colors.muted, fontSize: 30 },
@@ -208,7 +209,7 @@ const s = StyleSheet.create({
   parts: { flexDirection: "row", gap: 6, flexWrap: "wrap", marginBottom: 12 },
   passport: { gap: 18, paddingVertical: 15 },
   notes: {
-    minHeight: 200,
+    minHeight: 120,
     backgroundColor: colors.background,
     color: colors.text,
     borderRadius: 14,
