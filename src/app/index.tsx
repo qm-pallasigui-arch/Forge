@@ -36,7 +36,7 @@ export default function BodyScreen() {
         </Text>
       )}
       <View style={s.modes} accessibilityRole="radiogroup">{([["map", "Muscles"], ["heatmap", "Heatmap"], ["recovery", "Recent"], ["constellation", "Connect"]] as [Mode, string][]).map(([mode, label]) => <Pressable key={mode} accessibilityRole="radio" accessibilityState={{ checked: store.mode === mode }} aria-checked={store.mode === mode} onPress={() => store.setMode(mode)} style={[s.mode, store.mode === mode && { backgroundColor: store.accent }]}><Text style={[s.modeText, store.mode === mode && { color: "#101215" }]}>{label}</Text></Pressable>)}</View>
-      {store.mode === "recovery" && <Text style={s.legend}>Added under 12 h / 12?36 h / 36 h+</Text>}
+      {store.mode === "recovery" && <Text style={s.legend}>Added under 12 h / 12{"\u2013"}36 h / 36 h+</Text>}
       {store.mode === "constellation" && <Text style={s.legend}>Connect: muscle groups included in your routine</Text>}
       <Pressable
         accessibilityRole="button"

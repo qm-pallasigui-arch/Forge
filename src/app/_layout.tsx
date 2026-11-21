@@ -1,4 +1,5 @@
 import TabIcon from "../components/TabIcon";
+import { ReminderProvider } from "../notify/useReminders";
 import { Tabs } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
@@ -51,7 +52,7 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <FitMapProvider>
-        <View style={{ flex: 1, width: "100%", maxWidth: 480, alignSelf: "center", backgroundColor: colors.background }}><Navigation /></View>
+        <ReminderProvider><View style={{ flex: 1, width: "100%", maxWidth: 480, alignSelf: "center", backgroundColor: colors.background }}><Navigation /></View></ReminderProvider>
       </FitMapProvider>
     </SafeAreaProvider>
   );
