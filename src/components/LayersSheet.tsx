@@ -1,20 +1,21 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { colors } from "../state/FitMapStore";
+import { useExperience } from "../state/Experience";
+import { colors, useFitMap } from "../state/FitMapStore";
 import { Choice } from "./Controls";
 
 export default function LayersSheet({ depth, setDepth, onClose }: { depth: boolean; setDepth: (value: boolean) => void; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets(), store = useFitMap(), ux = useExperience();
   return <Modal transparent animationType="none" onRequestClose={onClose}>
     <View style={s.overlay}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close layers" accessibilityRole="button" />
       <View accessibilityViewIsModal style={[s.sheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
-        <View style={s.header}><Text style={s.title}>Layers</Text><Choice label="Done" onPress={onClose} /></View>
+        <View style={s.header}><Text style={s.title}>Menu</Text><Choice label="Done" onPress={onClose} /></View>
         <ScrollView contentContainerStyle={{ gap: 16 }}>
           <Text style={s.label}>Body view</Text>
           <View style={s.row}><Choice label="Illustration" active={!depth} onPress={() => setDepth(false)} /><Choice label="Depth view" active={depth} onPress={() => setDepth(true)} /></View>
           <Text style={s.detail}>Depth view: drag to rotate a layered version of the illustration.</Text>
-        </ScrollView>
+        <Text style={s.label}>Theme: {store.theme}</Text><Choice label="Change theme" onPress={store.cycleTheme} /><Choice label="Replay guide" onPress={() => { ux.replay(); onClose(); }} /></ScrollView>
       </View>
     </View>
   </Modal>;

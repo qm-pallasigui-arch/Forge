@@ -15,6 +15,7 @@ export function Choice({
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: !!active }}
+      aria-pressed={active}
       onPress={onPress}
       style={({ pressed }) => [
         s.choice,

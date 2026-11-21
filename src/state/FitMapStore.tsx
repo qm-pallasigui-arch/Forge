@@ -27,6 +27,7 @@ type Store = State & {
   add: (exercise: Exercise, view: BodyView, muscle: string) => void;
   update: (exercise: Exercise) => void;
   remove: (id: string) => void;
+  restore: (exercise: Exercise, index: number) => void;
   setNote: (key: string, note: string) => void;
   setMode: (mode: Mode) => void;
   cycleTheme: () => void;
@@ -99,6 +100,7 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
           })),
         remove: (id) =>
           setState((old) => ({ ...old, routine: old.routine.filter((x) => x.id !== id) })),
+        restore: (exercise, index) => setState((old) => { if (old.routine.some((item) => item.id === exercise.id)) return old; const routine = [...old.routine]; routine.splice(Math.min(index, routine.length), 0, exercise); return { ...old, routine }; }),
         setNote: (key, note) =>
           setState((old) => ({ ...old, notes: { ...old.notes, [key]: note } })),
         setMode: (mode) => setState((old) => ({ ...old, mode })),

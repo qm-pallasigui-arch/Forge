@@ -47,7 +47,7 @@ export default function PlanScreen() {
   const today = now.getDay(), key = dateKey(now), plan = store.schedule[today];
   const exercises = dayExercises(store.routine, plan);
   const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
-  return <SafeAreaView style={s.screen} edges={["top", "left", "right"]}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={s.screen} edges={["left", "right"]}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <Text style={s.title}>Plan</Text>
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
     <View style={[s.card, { borderColor: store.accent }]}>

@@ -1,3 +1,4 @@
+import { ExperienceProvider, ExperienceSurface, TourTarget } from "../state/Experience";
 import TabIcon from "../components/TabIcon";
 import { ReminderProvider } from "../notify/useReminders";
 import { Tabs } from "expo-router";
@@ -40,7 +41,7 @@ function Navigation() {
           options={{
             title: "Routine",
             tabBarBadge: store.routine.length || undefined,
-            tabBarIcon: ({ color }) => <TabIcon name="routine" color={color} />,
+            tabBarIcon: ({ color }) => <TourTarget name="routine" style={{ minWidth: 52, minHeight: 36, alignItems: "center", justifyContent: "center" }}><TabIcon name="routine" color={color} /></TourTarget>,
           }}
         />
         <Tabs.Screen name="plan" options={{ title: "Plan", tabBarIcon: ({ color }) => <TabIcon name="plan" color={color} /> }} />
@@ -52,7 +53,7 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <FitMapProvider>
-        <ReminderProvider><View style={{ flex: 1, width: "100%", maxWidth: 480, alignSelf: "center", backgroundColor: colors.background }}><Navigation /></View></ReminderProvider>
+        <ExperienceProvider><ReminderProvider><ExperienceSurface><Navigation /></ExperienceSurface></ReminderProvider></ExperienceProvider>
       </FitMapProvider>
     </SafeAreaProvider>
   );

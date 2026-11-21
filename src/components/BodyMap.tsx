@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { PanResponder, Platform, StyleSheet, View } from "react-native";
+import { createBodyGesture } from "../shared/gestures";
+import { useExperience } from "../state/Experience";
+import { useEffect, useState } from "react";
+import { Platform, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, G, LinearGradient, Path, Polyline, Stop } from "react-native-svg";
 import { artwork, back, names, anchors, details } from "../shared/body-artwork";
 import { useFitMap, type BodyView } from "../state/FitMapStore";
@@ -10,6 +12,10 @@ type Props = {
   selected: string | null;
   onSelect: (id: string, view: BodyView) => void;
   part?: string | null;
+  angle?: number;
+  onAngle?: (angle: number) => void;
+  onRotateStart?: () => void;
+  camera?: { zoom: number; x: number; y: number };
 };
 function Figure({
   view,
@@ -18,7 +24,9 @@ function Figure({
   silhouette = false,
   part,
 }: Omit<Props, "depth"> & { silhouette?: boolean }) {
-  const { accent, theme, routine, mode, recent } = useFitMap();
+  const { accent, theme, routine, mode: savedMode, recent } = useFitMap();
+  const ux = useExperience();
+  const mode = routine.length || ux.guide.unlocked ? savedMode : "map";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (silhouette || mode !== "recovery") return;
@@ -165,62 +173,20 @@ function Figure({
   );
 }
 
-function createRotationGesture(onChange: (angle: number) => void, enabled: boolean) {
-  let current = 0,
-    start = 0,
-    dragging = false;
-  const pan = PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => enabled && Math.abs(gesture.dx) > 8,
-    onMoveShouldSetPanResponderCapture: (_, gesture) => enabled && Math.abs(gesture.dx) > 8,
-    onPanResponderGrant: () => {
-      start = current;
-      dragging = true;
-    },
-    onPanResponderMove: (_, move) => {
-      current = start + move.dx * 0.7;
-      onChange(current);
-    },
-    onPanResponderRelease: () => {
-      dragging = false;
-    },
-    onPanResponderTerminate: () => {
-      dragging = false;
-    },
-  });
-  return { handlers: pan.panHandlers, isDragging: () => dragging };
-}
-
 export default function BodyMap(props: Props) {
-  const [angle, setAngle] = useState(0);
-  const gesture = useMemo(() => createRotationGesture(setAngle, props.depth), [props.depth]);
-  const normalized = ((angle % 360) + 360) % 360;
-  const flipped = normalized > 90 && normalized < 270;
-  const visibleView = flipped ? (props.view === "front" ? "back" : "front") : props.view;
-  const displayAngle = flipped ? angle + 180 : angle;
-  const transform = [{ perspective: 1000 }, { rotateY: `${props.depth ? displayAngle : 0}deg` }];
+  const [gesture] = useState(() => createBodyGesture(props));
+  useEffect(() => { gesture.update(props); }, [gesture, props]);
+  const angle = props.depth ? props.angle ?? 0 : props.view === "back" ? 180 : 0;
+  const flipped = Math.cos(angle * Math.PI / 180) < 0;
+  const visibleView = flipped ? "back" : "front";
+  const transform = [{ perspective: 1000 }, { rotateY: `${props.depth ? angle + (flipped ? 180 : 0) : 0}deg` }];
   const offset = Math.sin((angle * Math.PI) / 180) * 9;
-  const select = (id: string, view: BodyView) => {
-    if (!gesture.isDragging()) props.onSelect(id, view);
-  };
-  return (
-    <View style={styles.container} {...gesture.handlers} testID="body-map">
-      {props.depth &&
-        [1, 2, 3, 4].map((layer) => (
-          <View
-            key={layer}
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              { transform: [{ translateX: (-offset * layer) / 4 }, ...transform] },
-            ]}
-          >
-            <Figure {...props} view={visibleView} silhouette />
-          </View>
-        ))}
-      <View style={[StyleSheet.absoluteFill, { transform }]}>
-        <Figure {...props} view={visibleView} onSelect={select} />
-      </View>
+  const camera = props.camera ?? { zoom: 1, x: 0, y: 0 };
+  return <View style={styles.container} {...gesture.handlers} testID="body-map">
+    <View style={[StyleSheet.absoluteFill, { transform: [{ translateX: camera.x }, { translateY: camera.y }, { scale: camera.zoom }] }]}>
+      {props.depth && [1, 2, 3, 4].map((layer) => <View key={layer} pointerEvents="none" style={[StyleSheet.absoluteFill, { transform: [{ translateX: -offset * layer / 4 }, ...transform] }]}><Figure {...props} view={visibleView} silhouette /></View>)}
+      <View style={[StyleSheet.absoluteFill, { transform }]}><Figure {...props} view={visibleView} onSelect={(id, side) => { if (!gesture.isDragging()) props.onSelect(id, side); }} /></View>
     </View>
-  );
+  </View>;
 }
 const styles = StyleSheet.create({ container: { flex: 1, minHeight: 180 } });

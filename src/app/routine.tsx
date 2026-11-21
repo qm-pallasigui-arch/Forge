@@ -1,3 +1,6 @@
+import { createSwipeGesture } from "../shared/gestures";
+import { useEffect, useState } from "react";
+import { TourTarget, useExperience } from "../state/Experience";
 import WeightControl from "../components/WeightControl";
 import { router } from "expo-router";
 import {
@@ -15,9 +18,13 @@ import { colors, useFitMap } from "../state/FitMapStore";
 import { Stepper } from "../components/Controls";
 
 function RoutineCard({ exercise }: { exercise: Exercise }) {
-  const { update, remove } = useFitMap();
+  const { update, remove, restore, routine } = useFitMap(), ux = useExperience();
+  const featured = routine[0]?.id === exercise.id;
+  const erase = () => { const index = routine.findIndex((item) => item.id === exercise.id); remove(exercise.id); ux.notify("Exercise removed", "Undo", () => restore(exercise, index)); };
+  const [swipe] = useState(createSwipeGesture);
+  useEffect(() => { swipe.update(() => { if (!ux.guide.hints.includes("swipe")) { ux.notify("Swipe left to remove. You can undo removal."); ux.seen("swipe"); } }, erase); });
   return (
-    <View style={s.card}>
+    <View testID={`routine-card-${exercise.id}`} style={s.card} {...swipe.handlers}>
       <View style={s.cardHeader}>
         <View style={{ flex: 1 }}>
           <Text style={s.exercise}>{exercise.name}</Text>
@@ -26,25 +33,26 @@ function RoutineCard({ exercise }: { exercise: Exercise }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Remove ${exercise.name}`}
-          onPress={() => remove(exercise.id)}
+          onPress={erase}
           style={s.remove}
         >
           <Text style={s.removeText}>Remove</Text>
         </Pressable>
       </View>
-      <View style={s.values}>
+      <TourTarget name="weight" enabled={featured && exercise.equipment.toLowerCase() === "bodyweight"}><View style={s.values}>
         <Stepper
           label="Sets"
           value={exercise.sets}
-          onChange={(sets) => update({ ...exercise, sets })}
+          onChange={(sets) => { update({ ...exercise, sets }); if (exercise.equipment.toLowerCase() === "bodyweight") ux.mark("weight"); }}
         />
         <Stepper
           label="Reps"
           value={exercise.reps}
-          onChange={(reps) => update({ ...exercise, reps })}
+          onChange={(reps) => { update({ ...exercise, reps }); if (exercise.equipment.toLowerCase() === "bodyweight") ux.mark("weight"); }}
         />
       </View>
-      <WeightControl exercise={exercise} />
+      </TourTarget>
+      <WeightControl exercise={exercise} featured={featured} />
     </View>
   );
 }
@@ -52,7 +60,7 @@ export default function RoutineScreen() {
   const store = useFitMap();
   const groups = [...new Set(store.routine.map((x) => x.muscle))];
   return (
-    <SafeAreaView style={s.screen} edges={["top", "left", "right"]}>
+    <SafeAreaView style={s.screen} edges={["left", "right"]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
