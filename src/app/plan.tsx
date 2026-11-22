@@ -1,3 +1,4 @@
+import { workoutEntryState } from "../shared/workout-entry";
 import WorkoutEntry from "../components/WorkoutEntry";
 import { GuideScrollView } from "../state/Experience";
 import { useEffect, useState } from "react";
@@ -48,6 +49,8 @@ export default function PlanScreen() {
   }, []);
   const today = weekday(now), key = dateKey(now), plan = store.schedule[today];
   const exercises = plan.on ? dayExercises(store.routine, today) : [];
+  const entry = workoutEntryState({...store,now});
+  const [showSummary,setShowSummary] = useState(false);
   const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
   return <SafeAreaView style={s.screen} edges={["left", "right"]}><GuideScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <Text style={s.title}>Plan</Text>
@@ -57,7 +60,8 @@ export default function PlanScreen() {
       <Text style={s.heading}>{!plan.on ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
       <Text style={s.muted}>{exercises.length} exercises{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
       {exercises.map((exercise) => <Text key={exercise.id} style={s.body}>{exercise.name} / {exercise.sets} x {exercise.reps}</Text>)}
-      <WorkoutEntry exercises={exercises} />
+      {entry.latest && <><Text style={s.body}>Logged {"\u2713"} {"\u00b7"} {entry.minutes} min</Text><Choice label="View summary" onPress={()=>setShowSummary(!showSummary)} />{showSummary && <Text style={s.muted}>{entry.latest.exercises.reduce((n,e)=>n+e.setsDone,0)} sets in your last session</Text>}</>}
+      <WorkoutEntry />
       <Choice label="Open routine" onPress={() => router.navigate("/routine")} />
 
     </View>

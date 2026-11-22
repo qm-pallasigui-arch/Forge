@@ -71,7 +71,7 @@ export default function BodyScreen() {
         </>}
       </View>
     </TourTarget>
-    <WorkoutEntry exercises={store.routine} />
+    <WorkoutEntry pill />
     <Text style={s.hint}>Tap a muscle to see exercises</Text>
     <View style={s.center}>{(["front", "back"] as const).map((side) => <Choice key={side} label={side === "front" ? "Front" : "Back"} active={view === side} onPress={() => turn(side)} />)}</View>
     <Text style={s.disclaimer}>For general fitness information only.</Text>

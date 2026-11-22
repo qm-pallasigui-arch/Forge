@@ -1,3 +1,4 @@
+import { workoutEntryState } from "../shared/workout-entry";
 import { weekday } from "../shared/sessions";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
@@ -18,8 +19,8 @@ function useReminders() {
   const queue = useRef(Promise.resolve());
   const processed = useRef(new Set<string>());
   const lastContent = useRef<string | null>(null);
-  const activeWorkout = !!workout;
-  useEffect(() => { if (api) void configureWorkoutActions(api, activeWorkout).catch(() => setError("Could not update workout notification actions.")); }, [api, activeWorkout]);
+  const actionLabel = workoutEntryState({routine,schedule,history,workout,now:new Date()}).label;
+  useEffect(() => { if (api) void configureWorkoutActions(api, actionLabel).catch(() => setError("Could not update workout notification actions.")); }, [api, actionLabel]);
   useEffect(() => {
     if (Platform.OS === "web") return;
     let alive = true;
@@ -67,7 +68,7 @@ function useReminders() {
       processed.current.add(key);
       api.clearLastNotificationResponse();
       if (response.actionIdentifier === "start") {
-        const exercises = data.date === dateKey(new Date()) ? dayExercises(routine, weekday(new Date())) : [];
+        const exercises = data.date === dateKey(new Date()) ? workoutEntryState({routine,schedule,history,workout,now:new Date()}).exercises : [];
         if (workout || exercises.length) { startWorkout(exercises); mark("start"); router.navigate("/workout"); }
         else { router.navigate("/plan"); notify("Review today's plan before starting a workout."); }
       } else if (response.actionIdentifier === "skip") {
@@ -89,7 +90,7 @@ function useReminders() {
     const last = api.getLastNotificationResponse();
     if (last) handle(last);
     return () => subscription.remove();
-  }, [api, ready, skipDay, log, skips, reminders, routine, schedule, workout, startWorkout, mark, notify]);
+  }, [api, ready, skipDay, log, skips, reminders, routine, schedule, history, workout, startWorkout, mark, notify]);
   const enable = async (enabled: boolean) => {
     if (busy) return;
     if (!enabled) { setReminders({ ...reminders, enabled: false }); return; }
@@ -126,3 +127,4 @@ export function useReminderControls() {
   if (!value) throw new Error("Missing ReminderProvider");
   return value;
 }
+

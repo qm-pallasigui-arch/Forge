@@ -9,12 +9,12 @@ export async function loadNotifications(): Promise<NotificationAPI> {
   const api = await import("expo-notifications");
   api.setNotificationHandler({ handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }) });
   if (Platform.OS === "android") await api.setNotificationChannelAsync(CHANNEL, { name: "Workout reminders", importance: api.AndroidImportance.DEFAULT });
-  await configureWorkoutActions(api, false);
+  await configureWorkoutActions(api, "Start workout");
   return api;
 }
-export async function configureWorkoutActions(api: NotificationAPI, active: boolean) {
+export async function configureWorkoutActions(api: NotificationAPI, label: string) {
   await api.setNotificationCategoryAsync("fitmap-workout", [
-    { identifier: "start", buttonTitle: active ? "Resume workout" : "Start workout", options: { opensAppToForeground: true } },
+    { identifier: "start", buttonTitle: label, options: { opensAppToForeground: true } },
     { identifier: "snooze", buttonTitle: "Snooze 10 min", options: { opensAppToForeground: true } },
     { identifier: "skip", buttonTitle: "Skip today", options: { opensAppToForeground: true } },
   ]);
