@@ -1,9 +1,10 @@
+import HistoryPanel from "../components/HistoryPanel";
 import { workoutEntryState } from "../shared/workout-entry";
 import WorkoutEntry from "../components/WorkoutEntry";
 import { GuideScrollView, useExperience } from "../state/Experience";
-import { useEffect, useState, useRef, type ComponentRef } from "react";
+import { useEffect, useState, useRef, useCallback, type ComponentRef } from "react";
 import { AppState, Linking, Modal, Pressable, StyleSheet, Switch, ScrollView, Text, TextInput, View } from "react-native";
-import { router, usePathname } from "expo-router";
+import { router, usePathname, useFocusEffect } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Choice } from "../components/Controls";
 import { colors, useFitMap } from "../state/FitMapStore";
@@ -54,18 +55,19 @@ export default function PlanScreen() {
   const today = weekday(now), key = dateKey(now), plan = store.schedule[today];
   const exercises = plan.on ? dayExercises(store.routine, today) : [];
   const entry = workoutEntryState({...store,now});
-  const [showSummary,setShowSummary] = useState(false);
+  const [section,setSection] = useState<"week"|"history">("week"), [selectedSession,setSelectedSession] = useState<string|null>(null);
+  useFocusEffect(useCallback(()=>{setSection("week");},[]));
   const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
-  return <SafeAreaView style={s.screen} edges={["left", "right"]}><GuideScrollView scrollRef={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-    <Text style={s.title}>Plan</Text>
+  return <SafeAreaView style={s.screen} edges={["left", "right"]}><View style={{padding:16,gap:10}}><Text style={s.title}>Plan</Text><View style={s.row}><Choice label="Week" active={section==="week"} onPress={()=>setSection("week")}/><Choice label="History" active={section==="history"} onPress={()=>{setSection("history");setSelectedSession(null);}}/></View></View>{section==="history"?<HistoryPanel selectedId={selectedSession} onSelect={setSelectedSession} now={now}/>:<GuideScrollView scrollRef={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
     <View style={[s.card, { borderColor: store.accent }]}>
       <Text style={[s.eyebrow, { color: store.accent }]}>TODAY / {WEEKDAYS[today].toUpperCase()}</Text>
       <Text style={s.heading}>{!plan.on ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
       <Text style={s.muted}>{exercises.length} exercises{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
       {exercises.map((exercise) => <Text key={exercise.id} style={s.body}>{exercise.name} / {exercise.sets} x {exercise.reps}</Text>)}
-      {entry.latest && <><Text style={s.body}>Logged {"\u2713"} {"\u00b7"} {entry.minutes} min</Text><Choice label="View summary" onPress={()=>setShowSummary(!showSummary)} />{showSummary && <Text style={s.muted}>{entry.latest.exercises.reduce((n,e)=>n+e.setsDone,0)} sets in your last session</Text>}</>}
+      {entry.latest && <><Text style={s.body}>Logged {"\u2713"} {"\u00b7"} {entry.minutes} min</Text><Choice label="View summary" onPress={()=>{setSelectedSession(entry.latest!.id);setSection("history");}} /></>}
       {!exercises.length && <Choice label="Add workout" onPress={()=>addToDay(today)} />}
+      {!exercises.length && entry.exercises.length>0 && <Text style={s.muted}>Whole routine: {entry.exercises.length} exercises available</Text>}
       <WorkoutEntry />
       <Choice label="Open routine" onPress={() => router.navigate("/routine")} />
 
@@ -89,12 +91,12 @@ export default function PlanScreen() {
         <View style={s.row}><Text style={[s.heading,s.grow]}>{label}</Text><Switch accessibilityLabel={`${label} workout`} value={item.on} onValueChange={on=>store.setDayPlan(day,{...item,on})} trackColor={{true:store.accent}} style={s.switch}/></View>
         {item.on ? <TimePicker day={label} plan={item} onChange={value=>store.setDayPlan(day,value)}/> : <Text style={s.muted}>Rest day</Text>}
         {[...new Set(entries.map(e=>e.muscle))].map(muscle=><Text key={muscle} style={s.body}>{muscle}: {entries.filter(e=>e.muscle===muscle).map(e=>e.name).join(", ")}</Text>)}
-        {entries.map(e=><View key={e.id} style={s.row}><Text style={[s.body,s.grow]}>{e.name}</Text><Choice label={`Remove ${e.name} from ${label}`} onPress={()=>{store.assignDay(e.id,day,false);ux.notify(`Removed from ${label}`,"Undo",()=>store.assignDay(e.id,day,true));}}/></View>)}
+        {entries.map(e=><View key={e.id} style={s.row}><Text style={[s.body,s.grow]}>{e.name}</Text><Choice label={`Remove ${e.name} from ${label}`} onPress={()=>{store.assignDay(e.id,day,false);ux.notify(`Removed from ${label}`,"Undo",()=>{store.assignDay(e.id,day,true);if(!item.on)store.setDayPlan(day,item);});}}/></View>)}
         <Choice label={`Add exercises to ${label}`} onPress={()=>addToDay(day)}/>
       </View>;
     })}
     <Text style={s.muted}>For general fitness information only.</Text>
-  </GuideScrollView></SafeAreaView>;
+  </GuideScrollView>}</SafeAreaView>;
 }
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background }, content: { padding: 20, gap: 16, paddingBottom: 32 },
@@ -102,7 +104,7 @@ const s = StyleSheet.create({
   eyebrow: { fontSize: 11, fontWeight: "800", letterSpacing: 1.5 },
   card: { padding: 18, gap: 12, backgroundColor: colors.surface, borderRadius: 20, borderWidth: 1, borderColor: colors.border },
   muted: { color: colors.muted, fontSize: 13, lineHeight: 20 }, body: { color: colors.text, fontSize: 14, lineHeight: 21 },
-  row: { flexDirection: "row", alignItems: "center", gap: 12 }, grow: { flex: 1 }, switch: { minHeight: 44, minWidth: 48 },
+  row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 12 }, grow: { flex: 1 }, switch: { minHeight: 44, minWidth: 48 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 }, error: { color: "#ff9a89", fontSize: 13 },
   action: { minHeight: 44, padding: 12, justifyContent: "center", alignItems: "center", borderRadius: 22 }, actionText: { color: "#101215", fontWeight: "700", fontSize: 13 },
   overlay: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000a", padding: 20 }, dialog: { width: "100%", maxWidth: 400 },

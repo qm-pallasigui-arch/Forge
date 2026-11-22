@@ -32,7 +32,7 @@ const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
     assert.notEqual(await target.evaluate(node => getComputedStyle(node).borderTopColor), 'rgba(0, 0, 0, 0)');
     await add.click();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
-    await page.getByRole('button', { name: 'Start workout', exact: true }).click();
+    await page.getByRole('button', { name: /^Start workout/ }).click();
     await page.getByText("You're set", { exact: true }).waitFor();
     await page.getByRole('checkbox', { name: 'Bench Press, set 1 of 3, not done', exact: true }).waitFor();
     await page.screenshot({ path: '../.tmp/release-qa/guide-complete-360.png' });

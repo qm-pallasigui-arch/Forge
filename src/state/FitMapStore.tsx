@@ -129,7 +129,7 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
         discardWorkout: () => setState((old) => ({ ...old, workout: null })),
         finishWorkout: () => setState((old) => {
           const w = old.workout; if (!w || !completedSets(w)) return old;
-          const at = Date.now();
+          const at = Math.max(Date.now(), w.startedAt);
           const labels = w.exercises.filter((e) => w.completed[e.id]?.length).map((e) => e.muscle);
           const ids = Object.keys(names).filter((id) => labels.includes(names[id]));
           return { ...old, routine: progressRoutine(old.routine, w), workout: null, history: validateHistory([...old.history, finishSession(w,at)]), recent: { ...old.recent, ...Object.fromEntries(ids.flatMap((id) => [[`front:${id}`, at], [`back:${id}`, at]])) } };

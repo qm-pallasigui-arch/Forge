@@ -25,7 +25,7 @@ export const initial: State = { workout: null, history: [], schedule: normalizeS
 export const KEY = "fitmap.native.v1";
 export const KEYS = ["fitmap.state.v2", KEY, "fitmap.lastlog.v1", "fitmap.workout.v1", "fitmap.history.v1", "fitmap.routine.v1", "fitmap.prefs.v1", "fitmap.schedule.v1", "fitmap.log.v1", "fitmap.skips.v1", "fitmap-muscle-notes", "fitmap-recovery-times"];
 
-export function normalizeExercise(exercise: Exercise): Exercise { return { ...exercise, days: [...new Set((exercise.days ?? []).filter(d => Number.isInteger(d) && d >= 0 && d < 7))].sort(), weight: exercise.equipment.toLowerCase() === "bodyweight" ? 0 : normalizeWeight(exercise.weight) }; }
+export function normalizeExercise(exercise: Exercise): Exercise { return { ...exercise, sets: Math.max(1,Math.min(100,Math.round(exercise.sets))), reps: Math.max(1,Math.min(999,Math.round(exercise.reps))), days: [...new Set((exercise.days ?? []).filter(d => Number.isInteger(d) && d >= 0 && d < 7))].sort(), weight: exercise.equipment.toLowerCase() === "bodyweight" ? 0 : normalizeWeight(exercise.weight) }; }
 export function parseState(raw: string | null): State {
   if (!raw) return initial;
   try {
@@ -36,7 +36,7 @@ export function parseState(raw: string | null): State {
           (x: Exercise) =>
             x &&
             ["id", "name", "equipment", "muscle"].every(
-              (k) => typeof x[k as keyof Exercise] === "string",
+              (k) => typeof x[k as keyof Exercise] === "string" && String(x[k as keyof Exercise]).length > 0,
             ) &&
             [x.sets, x.reps, x.weight, x.progression].every(
               (n) => typeof n === "number" && Number.isFinite(n),
@@ -75,13 +75,13 @@ export function parseState(raw: string | null): State {
 
 
 export function migrateStateV1(value: Record<string, unknown>): State {
-  const oldSchedule = Array.isArray(value.schedule) ? value.schedule : Array.from({length:7}, (_, day) => ({ enabled: ((value.weeklyPlan as WeeklyPlan)?.[String(day)] ?? []).length > 0, hour:18, minute:0, muscles: ((value.weeklyPlan as WeeklyPlan)?.[String(day)] ?? []).flatMap(label => Object.keys(names).filter(id=>names[id]===label)) }));
   const old = parseState(JSON.stringify(value));
+  const oldSchedule = Array.isArray(value.schedule) ? value.schedule : Array.from({length:7}, (_, day) => ({ enabled: (old.weeklyPlan[String(day)] ?? []).length > 0, hour:18, minute:0, muscles: (old.weeklyPlan[String(day)] ?? []).flatMap(label => Object.keys(names).filter(id=>names[id]===label)) }));
   const schedule = Array.from({length:7},(_,day)=>{ const item=oldSchedule[(day+1)%7]; const hour=Number.isInteger(item?.hour)&&item.hour>=0&&item.hour<24?item.hour:18; const minute=Number.isInteger(item?.minute)&&item.minute>=0&&item.minute<60?item.minute:0; return {on:item?.enabled===true,time:`${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`}; });
   // Normalize first, but preserve the absence of days so legacy membership can be inferred.
   const rawRoutine = Array.isArray(value.routine) ? value.routine : [];
-  const routine = migrateRoutineDays(old.routine.map(e=>({...e,days:rawRoutine.find(x=>x.id===e.id)?.days})),oldSchedule);
-  return {...old, routine, schedule, history:migrateHistory(value.history ?? [],normalizeLog(value.log))};
+  const routine = migrateRoutineDays(old.routine.map(e=>({...e,days:rawRoutine.find(x=>x?.id===e.id)?.days})),oldSchedule);
+  return {...old, routine, schedule, history:migrateHistory(value.history === undefined ? [] : value.history,normalizeLog(value.log))};
 }
 export function hydrateState(entries: readonly (readonly [string, string | null])[]): State {
   const values=Object.fromEntries(entries);
@@ -90,6 +90,7 @@ export function hydrateState(entries: readonly (readonly [string, string | null]
     const state = parseState(values["fitmap.state.v2"]);
     return {...state,history:validateHistory(read("fitmap.history.v1",[]))};
   }
-  const legacy=read(KEY,{}) as Record<string,unknown>;
-  return migrateStateV1({...legacy,...read("fitmap.prefs.v1",{}) as object, routine:read("fitmap.routine.v1",legacy.routine), workout:read("fitmap.workout.v1",null), history:read("fitmap.history.v1",[]), schedule:read("fitmap.schedule.v1",legacy.schedule), log:read("fitmap.log.v1",legacy.log), skips:read("fitmap.skips.v1",legacy.skips), notes:read("fitmap-muscle-notes",legacy.notes), recent:read("fitmap-recovery-times",legacy.recent)});
+  const legacyValue=read(KEY,{});
+  const legacy=(legacyValue && typeof legacyValue==="object" ? legacyValue : {}) as Record<string,unknown>;
+  return migrateStateV1({...legacy,...read("fitmap.prefs.v1",{}) as object, routine:read("fitmap.routine.v1",legacy.routine), workout:read("fitmap.workout.v1",null), history:read("fitmap.history.v1",values["fitmap.history.v1"] ? null : []), schedule:read("fitmap.schedule.v1",legacy.schedule), log:read("fitmap.log.v1",legacy.log), skips:read("fitmap.skips.v1",legacy.skips), notes:read("fitmap-muscle-notes",legacy.notes), recent:read("fitmap-recovery-times",legacy.recent)});
 }
