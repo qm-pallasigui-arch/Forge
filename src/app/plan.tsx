@@ -1,5 +1,7 @@
+import WorkoutEntry from "../components/WorkoutEntry";
+import { GuideScrollView } from "../state/Experience";
 import { useEffect, useState } from "react";
-import { AppState, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { AppState, Linking, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Choice } from "../components/Controls";
@@ -47,7 +49,7 @@ export default function PlanScreen() {
   const today = now.getDay(), key = dateKey(now), plan = store.schedule[today];
   const exercises = dayExercises(store.routine, plan);
   const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
-  return <SafeAreaView style={s.screen} edges={["left", "right"]}><ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={s.screen} edges={["left", "right"]}><GuideScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <Text style={s.title}>Plan</Text>
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
     <View style={[s.card, { borderColor: store.accent }]}>
@@ -55,12 +57,13 @@ export default function PlanScreen() {
       <Text style={s.heading}>{!plan.enabled ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
       <Text style={s.muted}>{exercises.length} exercises{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
       {exercises.map((exercise) => <Text key={exercise.id} style={s.body}>{exercise.name} / {exercise.sets} x {exercise.reps}</Text>)}
+      <WorkoutEntry exercises={exercises} />
       <Choice label="Open routine" onPress={() => router.navigate("/routine")} />
       <Action label={store.log[key] ? "Logged \u2713" : "Log workout"} disabled={!!store.log[key] || !exercises.length} onPress={() => store.logWorkout(trained.map(({ id }) => id))} />
     </View>
     <View style={s.card}>
       <View style={s.row}><Text style={[s.heading, s.grow]}>Reminders</Text><Switch accessibilityLabel="Enable reminders" value={store.reminders.enabled} disabled={!controls.available || controls.busy} onValueChange={(value) => void controls.enable(value)} trackColor={{ true: store.accent }} style={s.switch} /></View>
-      <Text style={s.muted}>Local reminders for the next 28 days. Opening FitMap refreshes your schedule.</Text>
+      <Text style={s.muted}>Local reminders for the next 28 days. Opening FitMap refreshes your schedule. A final reminder asks you to reopen FitMap before the window ends.</Text>
       {!controls.available && <Text style={s.muted}>Reminders require the updated native app.</Text>}
       {controls.available && controls.permission !== "granted" && controls.permission !== "denied" && <Action label="Enable notifications" disabled={controls.busy} onPress={() => void controls.enable(true)} />}
       {controls.permission === "denied" && <><Text style={s.body}>Turn on notifications in Android Settings, Apps, FitMap, Notifications</Text><Choice label="Open notification settings" onPress={() => void Linking.openSettings()} /></>}
@@ -78,7 +81,7 @@ export default function PlanScreen() {
       </View>;
     })}
     <Text style={s.muted}>For general fitness information only.</Text>
-  </ScrollView></SafeAreaView>;
+  </GuideScrollView></SafeAreaView>;
 }
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background }, content: { padding: 20, gap: 16, paddingBottom: 32 },

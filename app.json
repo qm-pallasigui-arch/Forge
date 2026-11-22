@@ -1,26 +1,36 @@
 {
-  "expo": {
-    "name": "FitMap",
-    "slug": "fitmap-native",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "scheme": "fitmap",
-    "userInterfaceStyle": "dark",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.fitmap.app"
-    },
-    "android": {
-      "package": "com.fitmap.app",
-      "predictiveBackGestureEnabled": true
-    },
-    "plugins": [
-      "expo-router",
-      ["expo-notifications", { "color": "#FF5A36" }]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    }
-  }
+    "expo":  {
+                 "name":  "FitMap",
+                 "slug":  "fitmap-native",
+                 "version":  "1.0.0",
+                 "orientation":  "portrait",
+                 "icon":  "./assets/icon.png",
+                 "scheme":  "fitmap",
+                 "userInterfaceStyle":  "dark",
+                 "ios":  {
+                             "supportsTablet":  true,
+                             "bundleIdentifier":  "com.fitmap.app"
+                         },
+                 "android":  {
+                                 "package":  "com.fitmap.app",
+                                 "predictiveBackGestureEnabled":  true,
+                                 "blockedPermissions":  [
+                                                            "android.permission.SCHEDULE_EXACT_ALARM",
+                                                            "android.permission.USE_EXACT_ALARM"
+                                                        ]
+                             },
+                 "plugins":  [
+                                 "expo-router",
+                                 [
+                                     "expo-notifications",
+                                     {
+                                         "color":  "#FF5A36"
+                                     }
+                                 ],
+                                 "expo-sharing"
+                             ],
+                 "experiments":  {
+                                     "typedRoutes":  true
+                                 }
+             }
 }

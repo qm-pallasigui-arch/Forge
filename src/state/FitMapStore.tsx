@@ -1,3 +1,4 @@
+import { completedSets, newWorkout, toggleSet, progressRoutine, saveLastLog, adjustRest, editWorkoutExercise, remainingSets } from "../shared/workout";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { names } from "../shared/body-artwork";
@@ -21,6 +22,17 @@ export const colors = {
 };
 
 type Store = State & {
+  exportState: () => State;
+  importState: (state: State) => void;
+  startWorkout: (exercises: Exercise[]) => void;
+  checkSet: (id: string, index: number) => void;
+  stopRest: () => void;
+  adjustRest: (seconds: number) => void;
+  editWorkout: (id: string, patch: Partial<Pick<Exercise, "weight" | "reps" | "progression">>) => void;
+  includeExercises: (exercises: Exercise[]) => void;
+  skipExercise: (id: string) => void;
+  discardWorkout: () => void;
+  finishWorkout: () => void;
   ready: boolean;
   error: string | null;
   accent: string;
@@ -69,6 +81,9 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
     writes.current = writes.current
       .then(() => AsyncStorage.multiSet([
         ["fitmap.routine.v1", JSON.stringify(state.routine)],
+        ["fitmap.workout.v1", JSON.stringify(state.workout)],
+        ["fitmap.history.v1", JSON.stringify(state.history)],
+        ["fitmap.lastlog.v1", JSON.stringify(state.lastLog)],
         ["fitmap.prefs.v1", JSON.stringify({ theme: state.theme, mode: state.mode, reminders: state.reminders })],
         ["fitmap.schedule.v1", JSON.stringify(state.schedule)],
         ["fitmap.log.v1", JSON.stringify(state.log)],
@@ -89,6 +104,24 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
     <Context.Provider
       value={{
         ...state,
+        exportState: () => state,
+        importState: (next) => setState({ ...next, reminders: { ...next.reminders, enabled: false } }),
+        startWorkout: (exercises) => setState((old) => old.workout || !exercises.length ? old : { ...old, workout: newWorkout(exercises) }),
+        checkSet: (id, index) => setState((old) => old.workout ? { ...old, workout: toggleSet(old.workout, id, index) } : old),
+        stopRest: () => setState((old) => old.workout ? { ...old, workout: { ...old.workout, restUntil: null } } : old),
+        adjustRest: (seconds) => setState(old => old.workout ? { ...old, workout: adjustRest(old.workout, seconds) } : old),
+        editWorkout: (id, patch) => setState(old => old.workout ? { ...old, workout: editWorkoutExercise(old.workout, id, patch) } : old),
+        includeExercises: (exercises) => setState(old => { if (!old.workout) return old; const added = exercises.filter(e => !old.workout!.exercises.some(x => x.id === e.id)); return { ...old, workout: { ...old.workout, exercises: [...old.workout.exercises, ...added.map(e => ({...e}))], completed: { ...old.workout.completed, ...Object.fromEntries(added.map(e => [e.id, []])) } } }; }),
+        skipExercise: (id) => setState(old => { if (!old.workout) return old; const w = { ...old.workout, skipped: [...new Set([...(old.workout.skipped ?? []), id])] }; return { ...old, workout: { ...w, restUntil: remainingSets(w) ? w.restUntil : null } }; }),
+        discardWorkout: () => setState((old) => ({ ...old, workout: null })),
+        finishWorkout: () => setState((old) => {
+          const w = old.workout; if (!w || !completedSets(w)) return old;
+          const at = Date.now(), key = dateKey(new Date(at));
+          const labels = w.exercises.filter((e) => w.completed[e.id]?.length).map((e) => e.muscle);
+          const ids = Object.keys(names).filter((id) => labels.includes(names[id]));
+          const muscles = [...new Set([...(old.log[key]?.muscles ?? []), ...ids])];
+          return { ...old, lastLog: saveLastLog(old.lastLog, w, at), routine: progressRoutine(old.routine, w), workout: null, history: [...old.history, { ...w, restUntil: null, finishedAt: at }], log: { ...old.log, [key]: { at, muscles } }, recent: { ...old.recent, ...Object.fromEntries(ids.flatMap((id) => [[`front:${id}`, at], [`back:${id}`, at]])) } };
+        }),
         ready,
         error,
         accent: accents[state.theme],

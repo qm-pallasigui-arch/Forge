@@ -1,3 +1,4 @@
+import WorkoutEntry from "../components/WorkoutEntry";
 import { createSwipeGesture } from "../shared/gestures";
 import { useEffect, useState } from "react";
 import { TourTarget, useExperience } from "../state/Experience";
@@ -43,12 +44,12 @@ function RoutineCard({ exercise }: { exercise: Exercise }) {
         <Stepper
           label="Sets"
           value={exercise.sets}
-          onChange={(sets) => { update({ ...exercise, sets }); if (exercise.equipment.toLowerCase() === "bodyweight") ux.mark("weight"); }}
+          onChange={(sets) => { update({ ...exercise, sets }); }}
         />
         <Stepper
           label="Reps"
           value={exercise.reps}
-          onChange={(reps) => { update({ ...exercise, reps }); if (exercise.equipment.toLowerCase() === "bodyweight") ux.mark("weight"); }}
+          onChange={(reps) => { update({ ...exercise, reps }); }}
         />
       </View>
       </TourTarget>
@@ -72,6 +73,7 @@ export default function RoutineScreen() {
             sets
           </Text>
         </View>
+        <WorkoutEntry exercises={store.routine} />
         {store.error && (
           <Text accessibilityRole="alert" style={s.removeText}>
             {store.error}

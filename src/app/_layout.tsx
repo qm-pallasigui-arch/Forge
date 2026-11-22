@@ -45,6 +45,8 @@ function Navigation() {
           }}
         />
         <Tabs.Screen name="plan" options={{ title: "Plan", tabBarIcon: ({ color }) => <TabIcon name="plan" color={color} /> }} />
+        <Tabs.Screen name="workout" options={{ tabBarStyle: { display: "none" }, tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
+        <Tabs.Screen name="backup" options={{ tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
       </Tabs>
     </>
   );

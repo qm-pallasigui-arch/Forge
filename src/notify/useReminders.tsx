@@ -2,11 +2,13 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { AppState, Platform } from "react-native";
 import { router } from "expo-router";
 import { useFitMap } from "../state/FitMapStore";
-import { dateKey, dayExercises, planReminders } from "./scheduler";
-import { CHANNEL, loadNotifications, reminderData, scheduleOne, type NotificationAPI } from "./platform";
+import { useExperience } from "../state/Experience";
+import { dateKey, dayExercises, planReminders, renewalReminder } from "./scheduler";
+import { CHANNEL, configureWorkoutActions, loadNotifications, reminderData, scheduleOne, type NotificationAPI } from "./platform";
 
 function useReminders() {
-  const { ready, routine, schedule, log, skips, reminders, setReminders, skipDay } = useFitMap();
+  const { ready, routine, schedule, log, skips, reminders, setReminders, skipDay, workout, startWorkout } = useFitMap();
+  const { mark, notify } = useExperience();
   const [api, setAPI] = useState<NotificationAPI | null>(null);
   const [permission, setPermission] = useState("unknown");
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +17,8 @@ function useReminders() {
   const queue = useRef(Promise.resolve());
   const processed = useRef(new Set<string>());
   const lastContent = useRef<string | null>(null);
+  const activeWorkout = !!workout;
+  useEffect(() => { if (api) void configureWorkoutActions(api, activeWorkout).catch(() => setError("Could not update workout notification actions.")); }, [api, activeWorkout]);
   useEffect(() => {
     if (Platform.OS === "web") return;
     let alive = true;
@@ -40,10 +44,12 @@ function useReminders() {
       const content = JSON.stringify({ routine, schedule, reminders });
       const contentChanged = lastContent.current !== null && lastContent.current !== content;
       const planned = planReminders({ now: new Date(), routine, schedule, log, skips, prefs: { ...reminders, enabled: reminders.enabled && permission === "granted" } });
+      const renewal = renewalReminder(new Date(), planned);
+      if (renewal) planned.push(renewal);
       const existing = await api.getAllScheduledNotificationsAsync();
       for (const item of existing) {
         const data = reminderData(item.content.data);
-        if (item.identifier.startsWith("fitmap.plan.") || (item.identifier.startsWith("fitmap.snooze.") && (contentChanged || !reminders.enabled || permission !== "granted" || !data || log[data.date] || skips[data.date]))) await api.cancelScheduledNotificationAsync(item.identifier);
+        if (item.identifier === "fitmap.renewal" || item.identifier.startsWith("fitmap.plan.") || (item.identifier.startsWith("fitmap.snooze.") && (contentChanged || !reminders.enabled || permission !== "granted" || !data || log[data.date] || skips[data.date]))) await api.cancelScheduledNotificationAsync(item.identifier);
       }
       for (const item of planned) { if (obsolete) break; await scheduleOne(api, item); }
       if (!obsolete) { lastContent.current = content; setError(null); }
@@ -59,7 +65,11 @@ function useReminders() {
       if (processed.current.has(key)) return;
       processed.current.add(key);
       api.clearLastNotificationResponse();
-      if (response.actionIdentifier === "skip") {
+      if (response.actionIdentifier === "start") {
+        const exercises = data.date === dateKey(new Date()) ? dayExercises(routine, schedule[new Date().getDay()]) : [];
+        if (workout || exercises.length) { startWorkout(exercises); mark("start"); router.navigate("/workout"); }
+        else { router.navigate("/plan"); notify("Review today's plan before starting a workout."); }
+      } else if (response.actionIdentifier === "skip") {
         skipDay(data.date);
         router.navigate("/plan");
       } else if (response.actionIdentifier === "snooze") {
@@ -78,7 +88,7 @@ function useReminders() {
     const last = api.getLastNotificationResponse();
     if (last) handle(last);
     return () => subscription.remove();
-  }, [api, ready, skipDay, log, skips, reminders, routine, schedule]);
+  }, [api, ready, skipDay, log, skips, reminders, routine, schedule, workout, startWorkout, mark, notify]);
   const enable = async (enabled: boolean) => {
     if (busy) return;
     if (!enabled) { setReminders({ ...reminders, enabled: false }); return; }

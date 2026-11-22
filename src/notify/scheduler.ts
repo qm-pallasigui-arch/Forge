@@ -37,7 +37,12 @@ export function normalizeSkips(value: unknown): Skips {
 export function dayExercises(routine: Exercise[], day: DayPlan) {
   return day.enabled ? routine.filter((exercise) => day.muscles.some((id) => names[id] === exercise.muscle)) : [];
 }
-export type PlannedReminder = { identifier: string; date: Date; title: string; body: string; data: { fitmap: true; date: string; screen: "routine" } };
+export type PlannedReminder = { identifier: string; date: Date; title: string; body: string; data: { fitmap: true; date: string; screen: "routine" | "plan" } };
+export function renewalReminder(now: Date, planned: PlannedReminder[]): PlannedReminder | null {
+  if (!planned.length) return null;
+  const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 26, 18, 0);
+  return { identifier: "fitmap.renewal", date, title: "Keep your reminders going", body: "Open FitMap to keep reminders going.", data: { fitmap: true, date: dateKey(date), screen: "plan" } };
+}
 export function planReminders({ now, routine, schedule, log, skips, prefs }: { now: Date; routine: Exercise[]; schedule: Schedule; log: WorkoutLog; skips: Skips; prefs: ReminderPrefs }): PlannedReminder[] {
   if (!prefs.enabled) return [];
   const days = normalizeSchedule(schedule);

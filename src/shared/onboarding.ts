@@ -1,4 +1,4 @@
-export const STEPS = ["rotate", "select", "add", "routine", "weight"] as const;
+export const STEPS = ["select", "add", "start"] as const;
 export type GuideStep = typeof STEPS[number];
 export type GuideState = { completed: GuideStep[]; paused: boolean; dismissed: boolean; unlocked: boolean; hints: string[] };
 export const newGuide = (): GuideState => ({ completed: [], paused: false, dismissed: false, unlocked: false, hints: [] });

@@ -1,4 +1,5 @@
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useExperience } from "../state/Experience";
 import { colors, useFitMap } from "../state/FitMapStore";
@@ -12,6 +13,7 @@ export default function LayersSheet({ depth, setDepth, onClose }: { depth: boole
       <View accessibilityViewIsModal style={[s.sheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
         <View style={s.header}><Text style={s.title}>Menu</Text><Choice label="Done" onPress={onClose} /></View>
         <ScrollView contentContainerStyle={{ gap: 16 }}>
+          <Choice label="Backup and restore" onPress={() => { onClose(); router.navigate("/backup"); }} />
           <Text style={s.label}>Body view</Text>
           <View style={s.row}><Choice label="Illustration" active={!depth} onPress={() => setDepth(false)} /><Choice label="Depth view" active={depth} onPress={() => setDepth(true)} /></View>
           <Text style={s.detail}>Depth view: drag to rotate a layered version of the illustration.</Text>

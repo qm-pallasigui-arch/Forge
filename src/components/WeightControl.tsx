@@ -7,10 +7,11 @@ import { colors, useFitMap } from "../state/FitMapStore";
 import { OneTimeHint, TourTarget, useExperience } from "../state/Experience";
 import { Choice } from "./Controls";
 
-export default function WeightControl({ exercise, featured = false }: { exercise: Exercise; featured?: boolean }) {
+export default function WeightControl({ exercise, featured = false, onChange }: { exercise: Exercise; featured?: boolean; onChange?: (exercise: Exercise) => void }) {
   const ux = useExperience();
   const [expanded, setExpanded] = useState(false);
-  const { update, accent } = useFitMap();
+  const { update: updateRoutine, accent } = useFitMap();
+  const update = onChange ?? updateRoutine;
   const [draft, setDraft] = useState<string | null>(null);
   const [history, setHistory] = useState<number[]>([]);
   const [remove, setRemove] = useState(false);
@@ -18,7 +19,6 @@ export default function WeightControl({ exercise, featured = false }: { exercise
   if (exercise.equipment.toLowerCase() === "bodyweight") return null;
   const change = (value: number) => {
     const weight = normalizeWeight(value);
-    ux.mark("weight");
     if (weight === exercise.weight) return;
     setHistory((old) => [...old.slice(-19), exercise.weight]);
     update({ ...exercise, weight });
@@ -30,7 +30,7 @@ export default function WeightControl({ exercise, featured = false }: { exercise
     }
     setDraft(null);
   };
-  const open = expanded || (featured && ux.active && ux.step === "weight");
+  const open = expanded;
   const summary = <Pressable accessibilityRole="button" accessibilityLabel={`Edit weight for ${exercise.name}`} accessibilityState={{ expanded: open }} onPress={() => setExpanded(!open)} style={s.summary}><Text style={s.label}>{exercise.weight} kg {"\u00b7"} {exercise.progression ? `+${exercise.progression} next` : "same weight next"}</Text><Text style={s.note}>{open ? "Collapse" : "Edit"}</Text></Pressable>;
   const wrap = (children: React.ReactNode) => featured ? <TourTarget name="weight">{children}</TourTarget> : children;
   return <View style={s.container}>

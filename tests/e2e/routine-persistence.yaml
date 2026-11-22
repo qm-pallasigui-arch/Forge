@@ -1,0 +1,18 @@
+appId: com.fitmap.app
+---
+# Run only on a dedicated test installation: this clears its data.
+# Requires a standalone preview build, not the Expo development launcher.
+- launchApp:
+    clearState: true
+- tapOn: "Skip"
+- tapOn: "Choose muscle by name"
+- tapOn: "Chest"
+- tapOn: "Hide muscle list"
+- tapOn: "Add Bench Press"
+- tapOn: "View"
+- assertVisible: "Bench Press"
+- stopApp
+- launchApp
+- tapOn: "Routine.*"
+- assertVisible: "Bench Press"
+- assertVisible: "3"

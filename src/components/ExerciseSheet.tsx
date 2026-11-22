@@ -1,11 +1,11 @@
 import { useEffect, useState, type ComponentRef, type RefObject } from "react";
-import { BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BackHandler, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BlurView } from "expo-blur";
 import { router } from "expo-router";
 import { EXERCISES, SUBPARTS, type Exercise, type ExerciseDef } from "../shared/fitness";
 import { names } from "../shared/body-artwork";
 import { colors, useFitMap, type BodyView } from "../state/FitMapStore";
-import { TourTarget, useExperience } from "../state/Experience";
+import { GuideScrollView, TourTarget, useExperience } from "../state/Experience";
 import { Choice, Stepper } from "./Controls";
 
 function ExerciseRow({ item, id, view, compact, first }: { item: ExerciseDef; id: string; view: BodyView; compact: boolean; first: boolean }) {
@@ -38,7 +38,7 @@ export default function ExerciseSheet({ id, view, onClose, top, height, expanded
       <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={s.close}><Text style={s.closeText}>{"\u00d7"}</Text></Pressable>
     </View>
     {expanded && <View style={s.tabs}>{(["exercises", "summary", "notes"] as const).map((value) => <Choice key={value} label={value[0].toUpperCase() + value.slice(1)} active={tab === value} onPress={() => setTab(value)} />)}</View>}
-    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
+    <GuideScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
       {(!expanded || tab === "exercises") && <>
         {expanded && SUBPARTS[id] && <View style={s.parts}><Choice label="All" active={!part} onPress={() => setPart(null)} />{SUBPARTS[id].map((p) => <Choice key={p.id} label={p.label} active={part === p.id} onPress={() => setPart(p.id)} />)}</View>}
         {(expanded ? exercises : exercises.slice(0, 1)).map((item, index) => <ExerciseRow key={item.id} item={item} id={id} view={view} compact={!expanded} first={index === 0} />)}
@@ -46,7 +46,7 @@ export default function ExerciseSheet({ id, view, onClose, top, height, expanded
       </>}
       {expanded && tab === "summary" && <View style={s.summary}><Text style={s.exerciseName}>Your {names[id].toLowerCase()} routine</Text><Text style={s.muted}>{saved.length} exercises / {saved.reduce((n, item) => n + item.sets, 0)} sets</Text><Text style={s.muted}>Last activity: {store.recent[key] ? new Date(store.recent[key]).toLocaleString() : "No activity yet"}</Text>{saved.map((item) => <Text key={item.id} style={s.exerciseName}>{item.name} / {item.sets} x {item.reps}</Text>)}</View>}
       {expanded && tab === "notes" && <><Text style={s.muted}>Saved on this device</Text><TextInput multiline accessibilityLabel={`${names[id]} notes`} placeholder="Cues or things to remember" placeholderTextColor={colors.muted} value={store.notes[key] ?? ""} onChangeText={(note) => store.setNote(key, note)} style={s.notes} textAlignVertical="top" /></>}
-    </ScrollView>
+    </GuideScrollView>
   </View>;
 }
 const s = StyleSheet.create({

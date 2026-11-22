@@ -1,3 +1,4 @@
+import WorkoutEntry from "../components/WorkoutEntry";
 import type { ComponentRef } from "react";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -37,7 +38,7 @@ export default function BodyScreen() {
     setTargetCamera(focusCamera(...anchors[id], size.width, size.height, nextAngle));
   };
   const clear = () => { setSelected(null); setExpanded(false); setPart(null); setTargetCamera({ zoom: 1, x: 0, y: 0 }); };
-  const turn = (side: BodyView) => { setAngle(side === "front" ? 0 : 180); ux.mark("rotate"); };
+  const turn = (side: BodyView) => { setAngle(side === "front" ? 0 : 180); };
   const ids = Object.keys(view === "front" ? artwork.regions : back).filter((id) => view === "back" || id !== "traps");
   const anchor = selected ? anchors[selected.id] : anchors.chest;
   const pin = projectAnchor(...anchor, size.width, size.height, depth ? angle : view === "back" ? 180 : 0, camera.zoom, camera.x, camera.y);
@@ -45,7 +46,6 @@ export default function BodyScreen() {
   const card = placeCard(size.height * (lower ? 0.64 : 0.3), size.height, lower, expanded);
   const pinVisible = selected?.view === view && Math.abs(Math.cos(angle * Math.PI / 180)) > 0.08 && pin.x >= 0 && pin.x <= size.width && pin.y >= 0 && pin.y <= size.height;
   const edge = card.below ? card.top : card.top + card.height;
-  const chest = projectAnchor(...(view === "front" ? anchors.chest : anchors.lats), size.width, size.height, angle);
   const hints: Partial<Record<Mode, string>> = { heatmap: "Brighter muscles have more planned sets x reps. Gray means no exercises.", recovery: "Recent shows time since an exercise was added or a workout logged: accent under 12 h, amber 12-36 h, green 36 h+.", constellation: "Connect links muscle groups with exercises in your routine. It does not show anatomical connections." };
   const hintKey = `mode-${mode}`;
   const showHint = mode !== "map" && (!ux.active || !ux.step) && ux.ready;
@@ -54,14 +54,13 @@ export default function BodyScreen() {
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
     {unlocked && <View style={s.modes} accessibilityRole="radiogroup">{([["map", "Muscles"], ["heatmap", "Heatmap"], ["recovery", "Recent"], ["constellation", "Connect"]] as [Mode, string][]).map(([value, label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: mode === value }} aria-checked={mode === value} onPress={() => store.setMode(value)} style={[s.mode, mode === value && { backgroundColor: store.accent }]}><Text style={[s.modeText, mode === value && { color: "#101215" }]}>{label}</Text></Pressable>)}</View>}
     {showHint && <OneTimeHint key={hintKey} name={hintKey} message={hints[mode] ?? ""}><View style={s.row}>{!store.routine.length && <Choice label="Add exercises" onPress={() => { store.setMode("map"); setBrowse(true); }} />}</View></OneTimeHint>}
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: browse }} onPress={() => setBrowse(!browse)} style={s.browse}><Text style={s.browseLabel}>{browse ? "Hide muscle list" : "Choose muscle by name"}</Text></Pressable>
+    <TourTarget name="muscle"><Pressable accessibilityRole="button" accessibilityState={{ expanded: browse }} onPress={() => setBrowse(!browse)} style={s.browse}><Text style={s.browseLabel}>{browse ? "Hide muscle list" : "Choose muscle by name"}</Text></Pressable></TourTarget>
     {browse && <View><View style={s.row}><Choice label="Show front muscles" active={view === "front"} onPress={() => turn("front")} /><Choice label="Show back muscles" active={view === "back"} onPress={() => turn("back")} /></View><ScrollView horizontal style={s.names} contentContainerStyle={{ gap: 7 }}>{ids.map((id) => <Choice key={id} label={names[id]} onPress={() => pick(id, view)} />)}</ScrollView></View>}
     <TourTarget name="figure" style={s.figure}>
       <View style={s.canvas} onLayout={(event) => { const { width, height } = event.nativeEvent.layout; if (size.width !== width || size.height !== height) { setSize({ width, height }); setTargetCamera(selected ? focusCamera(...anchors[selected.id], width, height, angle) : { zoom: 1, x: 0, y: 0 }); } }}>
         <BlurTargetView ref={blurTarget} style={StyleSheet.absoluteFill}>
-          <BodyMap view={view} angle={angle} onAngle={setAngle} onRotateStart={() => ux.mark("rotate")} camera={camera} depth={depth} selected={selected?.view === view ? selected.id : null} part={part} onSelect={pick} />
+          <BodyMap view={view} angle={angle} onAngle={setAngle} camera={camera} depth={depth} selected={selected?.view === view ? selected.id : null} part={part} onSelect={pick} />
         </BlurTargetView>
-        {ux.active && ux.step === "select" && !selected && <View pointerEvents="none" style={{ position: "absolute", left: chest.x - 18, top: chest.y - 18 }}><TourTarget name="muscle"><Pulse size={36} /></TourTarget></View>}
         {selected && <>
           <Svg pointerEvents="none" width={size.width} height={size.height} style={StyleSheet.absoluteFill}>
             {pinVisible && <Path d={`M ${pin.x} ${pin.y} L ${size.width / 2} ${edge}`} stroke={store.accent} strokeWidth={1.5} strokeDasharray="4 5" />}
@@ -72,6 +71,7 @@ export default function BodyScreen() {
         </>}
       </View>
     </TourTarget>
+    <WorkoutEntry exercises={store.routine} />
     <Text style={s.hint}>Tap a muscle to see exercises</Text>
     <View style={s.center}>{(["front", "back"] as const).map((side) => <Choice key={side} label={side === "front" ? "Front" : "Back"} active={view === side} onPress={() => turn(side)} />)}</View>
     <Text style={s.disclaimer}>For general fitness information only.</Text>
