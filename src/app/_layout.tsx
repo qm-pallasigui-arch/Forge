@@ -19,6 +19,7 @@ function Navigation() {
     <>
       <StatusBar style="light" />
       <Tabs
+        screenListeners={({route})=>({tabPress:()=>{if(route.name!=="index")store.clearDay();}})}
         screenOptions={{
           headerShown: false,
           sceneStyle: { backgroundColor: colors.background },

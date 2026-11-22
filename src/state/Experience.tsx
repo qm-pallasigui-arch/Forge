@@ -1,6 +1,6 @@
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ComponentRef, type RefObject, type ReactNode } from "react";
 import { AccessibilityInfo, Animated, Pressable, StyleSheet, Text, View, ScrollView, type ScrollViewProps, type StyleProp, type ViewStyle } from "react-native";
 import { usePathname } from "expo-router";
 import { colors, useFitMap } from "./FitMapStore";
@@ -9,6 +9,7 @@ import { completeStep, newGuide, nextStep, parseGuide, type GuideStep } from "..
 type Toast = { message: string; action?: string; run?: () => void; id: number };
 type Target = "figure" | "muscle" | "add" | "start" | "routine" | "weight";
 function useExperienceState() {
+  const {targetWeekday}=useFitMap();
   const [guide, setGuide] = useState(newGuide), [ready, setReady] = useState(false), [error, setError] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(true), [toast, setToast] = useState<Toast | null>(null);
   const writable = useRef(false), writes = useRef(Promise.resolve());
@@ -35,7 +36,7 @@ function useExperienceState() {
     return () => clearTimeout(timer);
   }, [toast]);
   return { guide, ready, error, reducedMotion, mark, unlock, notify, toast, setToast,
-    step: nextStep(guide), active: ready && !guide.paused && !guide.dismissed,
+    step: nextStep(guide), active: ready && !guide.paused && !guide.dismissed && targetWeekday === null,
     skip: () => setGuide((old) => ({ ...old, paused: true })),
     resume: () => setGuide((old) => ({ ...old, paused: false })),
     dismiss: () => setGuide((old) => ({ ...old, dismissed: true })),
@@ -57,14 +58,14 @@ export function ExperienceProvider({ children }: { children: ReactNode }) {
   return <Context.Provider value={experience}>{children}</Context.Provider>;
 }
 const ScrollContext = createContext<((node: ComponentRef<typeof View>) => void) | null>(null);
-export function GuideScrollView({ children, onScroll, ...props }: ScrollViewProps) {
+export function GuideScrollView({ children, onScroll, scrollRef, ...props }: ScrollViewProps & {scrollRef?: RefObject<ComponentRef<typeof ScrollView> | null>}) {
   const ref = useRef<ComponentRef<typeof ScrollView>>(null), offset = useRef(0), { reducedMotion } = useExperience();
   const reveal = useCallback((node: ComponentRef<typeof View>) => {
     ref.current?.measureInWindow((_x, top, _width, height) => node.measureInWindow((_tx, y, _tw, h) => {
       if (y < top || y + h > top + height) ref.current?.scrollTo({ y: Math.max(0, offset.current + y - top - 16), animated: !reducedMotion });
     }));
   }, [reducedMotion]);
-  return <ScrollContext.Provider value={reveal}><ScrollView {...props} ref={ref} scrollEventThrottle={16} onScroll={(event) => { offset.current = event.nativeEvent.contentOffset.y; onScroll?.(event); }}>{children}</ScrollView></ScrollContext.Provider>;
+  return <ScrollContext.Provider value={reveal}><ScrollView {...props} ref={node=>{ref.current=node;if(scrollRef)scrollRef.current=node;}} scrollEventThrottle={16} onScroll={(event) => { offset.current = event.nativeEvent.contentOffset.y; onScroll?.(event); }}>{children}</ScrollView></ScrollContext.Provider>;
 }
 export function GuideTarget({ name, children, style, enabled = true }: { name: Target; children: ReactNode; style?: StyleProp<ViewStyle>; enabled?: boolean }) {
   const ref = useRef<ComponentRef<typeof View>>(null), reveal = useContext(ScrollContext), ux = useExperience(), { accent } = useFitMap(), path = usePathname();

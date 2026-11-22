@@ -23,6 +23,12 @@ export const colors = {
 };
 
 type Store = State & {
+  targetWeekday: number | null;
+  returnWeekday: number | null;
+  beginDay: (day: number) => void;
+  endDay: () => void;
+  clearDay: () => void;
+  assignDay: (id: string, day: number, included: boolean) => void;
   log: ReturnType<typeof historyLog>;
   lastLog: ReturnType<typeof lastExerciseLog>;
   deleteSession: (id: string) => void;
@@ -55,6 +61,7 @@ type Store = State & {
 const Context = createContext<Store | null>(null);
 export function FitMapProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(initial);
+  const [targetWeekday, setTargetWeekday] = useState<number | null>(null), [returnWeekday,setReturnWeekday] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const writes = useRef(Promise.resolve());
@@ -94,13 +101,19 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
   const add: Store["add"] = (exercise, view, muscle) =>
     setState((old) => ({
       ...old,
-      routine: [...old.routine.filter((x) => x.id !== exercise.id), normalizeExercise(exercise)],
+      routine: [...old.routine.filter((x) => x.id !== exercise.id), normalizeExercise({...exercise, days: targetWeekday === null ? (old.routine.find(e=>e.id===exercise.id)?.days ?? exercise.days ?? []) : [...new Set([...(old.routine.find(e=>e.id===exercise.id)?.days ?? []), targetWeekday])]})],
+      schedule: old.schedule.map((d,i)=>i===targetWeekday?{...d,on:true}:d),
       recent: { ...old.recent, [`${view}:${muscle}`]: Date.now() },
     }));
   return (
     <Context.Provider
       value={{
         ...state,
+        targetWeekday, returnWeekday,
+        beginDay: (day) => { if(Number.isInteger(day)&&day>=0&&day<7){setTargetWeekday(day);setReturnWeekday(null);} },
+        endDay: () => {setReturnWeekday(targetWeekday);setTargetWeekday(null);},
+        clearDay: () => setTargetWeekday(null),
+        assignDay: (id,day,included) => setState(old=>({...old,routine:old.routine.map(e=>e.id===id?{...e,days:included?[...new Set([...e.days,day])].sort():e.days.filter(d=>d!==day)}:e),schedule:old.schedule.map((d,i)=>i===day&&included?{...d,on:true}:d)})),
         log: derivedLog,
         lastLog: derivedLastLog,
         deleteSession: (id) => setState(old => ({...old, history:old.history.filter(s=>s.id!==id)})),

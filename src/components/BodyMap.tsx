@@ -7,6 +7,8 @@ import { artwork, back, names, anchors, details } from "../shared/body-artwork";
 import { useFitMap, type BodyView } from "../state/FitMapStore";
 
 type Props = {
+  highlighted?: string[];
+  staticFigure?: boolean;
   view: BodyView;
   depth: boolean;
   selected: string | null;
@@ -22,11 +24,12 @@ function Figure({
   selected,
   onSelect,
   silhouette = false,
+  highlighted,
   part,
 }: Omit<Props, "depth"> & { silhouette?: boolean }) {
   const { accent, theme, routine, mode: savedMode, recent } = useFitMap();
   const ux = useExperience();
-  const mode = routine.length || ux.guide.unlocked ? savedMode : "map";
+  const mode = highlighted ? "map" : routine.length || ux.guide.unlocked ? savedMode : "map";
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (silhouette || mode !== "recovery") return;
@@ -47,6 +50,7 @@ function Figure({
   const connected = Object.keys(regions).filter((id) => volumes[id] > 0);
   const fill = (id: string) => {
     if (id === selected) return accent;
+    if (highlighted) return highlighted.includes(names[id]) ? accent : "#3a4453";
     if (mode === "heatmap") return volumes[id] ? accent : "#3a4453";
     if (mode === "recovery") {
       const stamp = recent[`${view}:${id}`];
@@ -182,7 +186,7 @@ export default function BodyMap(props: Props) {
   const transform = [{ perspective: 1000 }, { rotateY: `${props.depth ? angle + (flipped ? 180 : 0) : 0}deg` }];
   const offset = Math.sin((angle * Math.PI) / 180) * 9;
   const camera = props.camera ?? { zoom: 1, x: 0, y: 0 };
-  return <View style={styles.container} {...gesture.handlers} testID="body-map">
+  return <View style={[styles.container, props.staticFigure && {minHeight:0}]} {...(props.staticFigure ? {} : gesture.handlers)} testID={props.staticFigure ? undefined : "body-map"}>
     <View style={[StyleSheet.absoluteFill, { transform: [{ translateX: camera.x }, { translateY: camera.y }, { scale: camera.zoom }] }]}>
       {props.depth && [1, 2, 3, 4].map((layer) => <View key={layer} pointerEvents="none" style={[StyleSheet.absoluteFill, { transform: [{ translateX: -offset * layer / 4 }, ...transform] }]}><Figure {...props} view={visibleView} silhouette /></View>)}
       <View style={[StyleSheet.absoluteFill, { transform }]}><Figure {...props} view={visibleView} onSelect={(id, side) => { if (!gesture.isDragging()) props.onSelect(id, side); }} /></View>

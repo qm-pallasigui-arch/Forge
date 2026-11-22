@@ -1,7 +1,8 @@
+import { DAYS } from "../shared/sessions";
 import { useEffect, useState, type ComponentRef, type RefObject } from "react";
 import { BackHandler, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BlurView } from "expo-blur";
-import { router } from "expo-router";
+import { router, usePathname } from "expo-router";
 import { EXERCISES, SUBPARTS, type Exercise, type ExerciseDef } from "../shared/fitness";
 import { names } from "../shared/body-artwork";
 import { colors, useFitMap, type BodyView } from "../state/FitMapStore";
@@ -10,13 +11,17 @@ import { Choice, Stepper } from "./Controls";
 
 function ExerciseRow({ item, id, view, compact, first }: { item: ExerciseDef; id: string; view: BodyView; compact: boolean; first: boolean }) {
   const store = useFitMap(), ux = useExperience();
+  const target=store.targetWeekday;
   const existing = store.routine.find((x) => x.id === item.id);
   const [sets, setSets] = useState(existing?.sets ?? 3), [reps, setReps] = useState(existing?.reps ?? 10);
   const add = () => {
-    store.add({ ...item, muscle: names[id], sets, reps, weight: existing?.weight ?? 0, progression: existing?.progression ?? 2.5 } as Exercise, view, id);
+    store.add({ ...item, days:existing?.days??[], muscle: names[id], sets, reps, weight: existing?.weight ?? 0, progression: existing?.progression ?? 2.5 } as Exercise, view, id);
+    if(target!==null){ux.mark("add");ux.notify(`Added to ${DAYS[target]}`);return;}
     ux.mark("add"); ux.notify(existing ? "Routine updated" : "Added to routine", "View", () => router.navigate("/routine"));
   };
-  const button = <Pressable accessibilityRole="button" accessibilityLabel={`${existing ? "Update" : "Add"} ${item.name}`} onPress={add} style={[s.add, { backgroundColor: store.accent }]}><Text style={s.addText}>{existing ? "\u2713" : "+"}</Text></Pressable>;
+  const onDay=target!==null&&existing?.days.includes(target);
+  const remove=()=>{if(target===null||!existing)return;store.assignDay(existing.id,target,false);ux.notify(`Removed from ${DAYS[target]}`,"Undo",()=>store.assignDay(existing.id,target,true));};
+  const button = target!==null ? <View style={{gap:2}}>{onDay?<><Text style={s.muted}>On {DAYS[target]}</Text><Choice label={`Remove ${item.name} from ${DAYS[target]}`} onPress={remove} /></>:<Pressable accessibilityRole="button" accessibilityLabel={`Add ${item.name} to ${DAYS[target]}`} onPress={add} style={[s.add,{width:undefined,maxWidth:160,paddingHorizontal:10,backgroundColor:store.accent}]}><Text style={{color:colors.background,fontWeight:"700",fontSize:12}}>Add to {DAYS[target]}</Text></Pressable>}</View>:<Pressable accessibilityRole="button" accessibilityLabel={`${existing ? "Update" : "Add"} ${item.name}`} onPress={add} style={[s.add, { backgroundColor: store.accent }]}><Text style={s.addText}>{existing ? "\u2713" : "+"}</Text></Pressable>;
   return <View style={s.exercise}>
     <View style={s.row}><View style={{ flex: 1 }}><Text style={s.exerciseName}>{item.name}</Text><Text style={s.muted}>{item.equipment}</Text></View>{compact && (first ? <TourTarget name="add">{button}</TourTarget> : button)}</View>
     {!compact && <View style={s.row}><Stepper label="Sets" value={sets} onChange={setSets} /><Stepper label="Reps" value={reps} onChange={setReps} />{first ? <TourTarget name="add">{button}</TourTarget> : button}</View>}
@@ -25,8 +30,8 @@ function ExerciseRow({ item, id, view, compact, first }: { item: ExerciseDef; id
 export default function ExerciseSheet({ id, view, onClose, top, height, expanded, onExpand, blurTarget, part, setPart }: {
   id: string; view: BodyView; onClose: () => void; top: number; height: number; expanded: boolean; onExpand: () => void; blurTarget: RefObject<ComponentRef<typeof View> | null>; part: string | null; setPart: (value: string | null) => void;
 }) {
-  const store = useFitMap();
-  useEffect(() => { const listener = BackHandler.addEventListener("hardwareBackPress", () => { onClose(); return true; }); return () => listener.remove(); }, [onClose]);
+  const store = useFitMap(), path=usePathname();
+  useEffect(() => { if(path!=="/")return;const listener = BackHandler.addEventListener("hardwareBackPress", () => { if(store.targetWeekday!==null){store.endDay();router.navigate("/plan");}else onClose(); return true; }); return () => listener.remove(); });
   const [tab, setTab] = useState<"exercises" | "summary" | "notes">("exercises");
   const key = `${view}:${id}`;
   const exercises = (EXERCISES[id] ?? []).filter((item) => !part || item.parts?.includes(part));
