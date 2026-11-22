@@ -1,5 +1,6 @@
 export type ExerciseDef = { id: string; name: string; equipment: string; parts?: string[] };
 export type Exercise = {
+  days: number[];
   id: string;
   name: string;
   equipment: string;

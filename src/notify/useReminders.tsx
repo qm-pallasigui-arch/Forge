@@ -1,3 +1,4 @@
+import { weekday } from "../shared/sessions";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { router } from "expo-router";
@@ -7,7 +8,7 @@ import { dateKey, dayExercises, planReminders, renewalReminder } from "./schedul
 import { CHANNEL, configureWorkoutActions, loadNotifications, reminderData, scheduleOne, type NotificationAPI } from "./platform";
 
 function useReminders() {
-  const { ready, routine, schedule, log, skips, reminders, setReminders, skipDay, workout, startWorkout } = useFitMap();
+  const { ready, routine, schedule, history, log, skips, reminders, setReminders, skipDay, workout, startWorkout } = useFitMap();
   const { mark, notify } = useExperience();
   const [api, setAPI] = useState<NotificationAPI | null>(null);
   const [permission, setPermission] = useState("unknown");
@@ -43,7 +44,7 @@ function useReminders() {
       if (obsolete) return;
       const content = JSON.stringify({ routine, schedule, reminders });
       const contentChanged = lastContent.current !== null && lastContent.current !== content;
-      const planned = planReminders({ now: new Date(), routine, schedule, log, skips, prefs: { ...reminders, enabled: reminders.enabled && permission === "granted" } });
+      const planned = planReminders({ now: new Date(), routine, schedule, history, skips, prefs: { ...reminders, enabled: reminders.enabled && permission === "granted" } });
       const renewal = renewalReminder(new Date(), planned);
       if (renewal) planned.push(renewal);
       const existing = await api.getAllScheduledNotificationsAsync();
@@ -55,7 +56,7 @@ function useReminders() {
       if (!obsolete) { lastContent.current = content; setError(null); }
     }).catch(() => setError("Could not update reminders. Open Plan and try again."));
     return () => { obsolete = true; };
-  }, [api, ready, routine, schedule, log, skips, reminders, permission, revision]);
+  }, [api, ready, routine, schedule, history, log, skips, reminders, permission, revision]);
   useEffect(() => {
     if (!api || !ready) return;
     const handle: Parameters<NotificationAPI["addNotificationResponseReceivedListener"]>[0] = (response) => {
@@ -66,7 +67,7 @@ function useReminders() {
       processed.current.add(key);
       api.clearLastNotificationResponse();
       if (response.actionIdentifier === "start") {
-        const exercises = data.date === dateKey(new Date()) ? dayExercises(routine, schedule[new Date().getDay()]) : [];
+        const exercises = data.date === dateKey(new Date()) ? dayExercises(routine, weekday(new Date())) : [];
         if (workout || exercises.length) { startWorkout(exercises); mark("start"); router.navigate("/workout"); }
         else { router.navigate("/plan"); notify("Review today's plan before starting a workout."); }
       } else if (response.actionIdentifier === "skip") {
@@ -75,7 +76,7 @@ function useReminders() {
       } else if (response.actionIdentifier === "snooze") {
         router.navigate("/plan");
         if (!reminders.enabled || log[data.date] || skips[data.date] || data.date !== dateKey(new Date())) return;
-        const exercises = dayExercises(routine, schedule[new Date().getDay()]);
+        const exercises = dayExercises(routine, weekday(new Date()));
         if (!exercises.length) return;
         const labels = [...new Set(exercises.map((exercise) => exercise.muscle))];
         const body = reminders.private ? "Your planned workout is ready to view." : `${labels.join(" + ")}: ${exercises.length} exercise${exercises.length === 1 ? "" : "s"} planned.`;

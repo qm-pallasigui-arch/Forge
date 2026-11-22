@@ -6,8 +6,8 @@ const exercise={id:'bench',name:'Bench Press',muscle:'Chest',equipment:'Barbell'
 test('migrates legacy routine, notes, recent, preferences and weekly muscle names',()=>{
  const old={routine:[exercise],notes:{'front:chest':'keep'},recent:{'front:chest':100},theme:'neon',mode:'recovery',weeklyPlan:{'1':['Chest']}};
  const state=hydrateState([['fitmap.native.v1',JSON.stringify(old)]]);
- assert.deepEqual(state.routine,[exercise]); assert.deepEqual(state.notes,old.notes); assert.deepEqual(state.recent,old.recent); assert.equal(state.theme,'neon'); assert.equal(state.mode,'recovery');
- assert.deepEqual(state.schedule[1],{enabled:true,hour:18,minute:0,muscles:['chest']});assert.equal(state.reminders.enabled,false);
+ assert.deepEqual(state.routine,[{...exercise,days:[0]}]); assert.deepEqual(state.notes,old.notes); assert.deepEqual(state.recent,old.recent); assert.equal(state.theme,'neon'); assert.equal(state.mode,'recovery');
+ assert.deepEqual(state.schedule[0],{on:true,time:'18:00'});assert.equal(state.reminders.enabled,false);
 });
 test('versioned keys override legacy without resurrecting removed workouts',()=>{
  const state=hydrateState([['fitmap.native.v1',JSON.stringify({routine:[exercise]})],['fitmap.routine.v1','[]'],['fitmap.prefs.v1',JSON.stringify({reminders:{enabled:true,private:true}})]]);

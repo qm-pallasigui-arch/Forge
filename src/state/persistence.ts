@@ -1,7 +1,8 @@
-import { parseWorkout, saveLastLog, type LastLog, type Workout } from "../shared/workout";
+import { migrateHistory, migrateRoutineDays, validateHistory, type Session } from "../shared/sessions";
+import { parseWorkout, type Workout } from "../shared/workout";
 import { names } from "../shared/body-artwork";
 import { normalizeWeight } from "../shared/weight";
-import { normalizeSchedule, normalizeLog, normalizeSkips, type Schedule, type WorkoutLog, type Skips, type ReminderPrefs } from "../notify/scheduler";
+import { normalizeSchedule, normalizeLog, normalizeSkips, type Schedule, type Skips, type ReminderPrefs } from "../notify/scheduler";
 import type { Exercise } from "../shared/fitness";
 import { parseWeeklyPlan, type WeeklyPlan } from "../shared/weekly-plan";
 export type Theme = "classic" | "blueprint" | "neon";
@@ -9,10 +10,8 @@ export type Mode = "map" | "heatmap" | "recovery" | "constellation";
 export type BodyView = "front" | "back";
 export type State = {
   workout: Workout | null;
-  history: Workout[];
-  lastLog: LastLog;
+  history: Session[];
   schedule: Schedule;
-  log: WorkoutLog;
   skips: Skips;
   reminders: ReminderPrefs;
   weeklyPlan: WeeklyPlan;
@@ -22,11 +21,11 @@ export type State = {
   theme: Theme;
   mode: Mode;
 };
-export const initial: State = { workout: null, history: [], lastLog: {}, schedule: normalizeSchedule(null), log: {}, skips: {}, reminders: { enabled: false, private: false }, routine: [], notes: {}, recent: {}, theme: "classic", mode: "map", weeklyPlan: {} };
+export const initial: State = { workout: null, history: [], schedule: normalizeSchedule(null), skips: {}, reminders: { enabled: false, private: false }, routine: [], notes: {}, recent: {}, theme: "classic", mode: "map", weeklyPlan: {} };
 export const KEY = "fitmap.native.v1";
-export const KEYS = [KEY, "fitmap.lastlog.v1", "fitmap.workout.v1", "fitmap.history.v1", "fitmap.routine.v1", "fitmap.prefs.v1", "fitmap.schedule.v1", "fitmap.log.v1", "fitmap.skips.v1", "fitmap-muscle-notes", "fitmap-recovery-times"];
+export const KEYS = ["fitmap.state.v2", KEY, "fitmap.lastlog.v1", "fitmap.workout.v1", "fitmap.history.v1", "fitmap.routine.v1", "fitmap.prefs.v1", "fitmap.schedule.v1", "fitmap.log.v1", "fitmap.skips.v1", "fitmap-muscle-notes", "fitmap-recovery-times"];
 
-export function normalizeExercise(exercise: Exercise): Exercise { return { ...exercise, weight: exercise.equipment.toLowerCase() === "bodyweight" ? 0 : normalizeWeight(exercise.weight) }; }
+export function normalizeExercise(exercise: Exercise): Exercise { return { ...exercise, days: [...new Set((exercise.days ?? []).filter(d => Number.isInteger(d) && d >= 0 && d < 7))].sort(), weight: exercise.equipment.toLowerCase() === "bodyweight" ? 0 : normalizeWeight(exercise.weight) }; }
 export function parseState(raw: string | null): State {
   if (!raw) return initial;
   try {
@@ -57,11 +56,9 @@ export function parseState(raw: string | null): State {
       ),
     ) as Record<string, number>;
     return {
-      lastLog: Object.fromEntries(Object.entries(value.lastLog ?? {}).filter(([, item]) => { const v = item as LastLog[string]; return v && Number.isFinite(v.weight) && v.weight >= 0 && v.weight <= 999 && Number.isInteger(v.reps) && v.reps > 0 && Number.isFinite(v.at); })) as LastLog,
       workout: parseWorkout(value.workout),
-      history: (Array.isArray(value.history) ? value.history : []).map(parseWorkout).filter((w: Workout | null): w is Workout => !!w && !!w.finishedAt),
+      history: validateHistory(value.history),
       schedule: normalizeSchedule(value.schedule),
-      log: normalizeLog(value.log),
       skips: normalizeSkips(value.skips),
       reminders: { enabled: value.reminders?.enabled === true, private: value.reminders?.private === true },
       weeklyPlan: parseWeeklyPlan(value.weeklyPlan),
@@ -77,12 +74,22 @@ export function parseState(raw: string | null): State {
 }
 
 
+export function migrateStateV1(value: Record<string, unknown>): State {
+  const oldSchedule = Array.isArray(value.schedule) ? value.schedule : Array.from({length:7}, (_, day) => ({ enabled: ((value.weeklyPlan as WeeklyPlan)?.[String(day)] ?? []).length > 0, hour:18, minute:0, muscles: ((value.weeklyPlan as WeeklyPlan)?.[String(day)] ?? []).flatMap(label => Object.keys(names).filter(id=>names[id]===label)) }));
+  const old = parseState(JSON.stringify(value));
+  const schedule = Array.from({length:7},(_,day)=>{ const item=oldSchedule[(day+1)%7]; const hour=Number.isInteger(item?.hour)&&item.hour>=0&&item.hour<24?item.hour:18; const minute=Number.isInteger(item?.minute)&&item.minute>=0&&item.minute<60?item.minute:0; return {on:item?.enabled===true,time:`${String(hour).padStart(2,"0")}:${String(minute).padStart(2,"0")}`}; });
+  // Normalize first, but preserve the absence of days so legacy membership can be inferred.
+  const rawRoutine = Array.isArray(value.routine) ? value.routine : [];
+  const routine = migrateRoutineDays(old.routine.map(e=>({...e,days:rawRoutine.find(x=>x.id===e.id)?.days})),oldSchedule);
+  return {...old, routine, schedule, history:migrateHistory(value.history ?? [],normalizeLog(value.log))};
+}
 export function hydrateState(entries: readonly (readonly [string, string | null])[]): State {
-        const values = Object.fromEntries(entries);
-        const legacy = parseState(values[KEY]);
-        const read = (key: string, fallback: unknown) => { if (!values[key]) return fallback; try { return JSON.parse(values[key]!); } catch { return fallback; } };
-        const migratedSchedule = Array.from({ length: 7 }, (_, day) => { const muscles = (legacy.weeklyPlan[String(day)] ?? []).flatMap((label) => Object.keys(names).filter((id) => names[id] === label)); return { enabled: muscles.length > 0, hour: 18, minute: 0, muscles }; });
-        const restoredHistory = parseState(JSON.stringify({ history: read("fitmap.history.v1", []) })).history;
-        const prefs = read("fitmap.prefs.v1", { theme: legacy.theme, mode: legacy.mode, reminders: legacy.reminders });
-        return parseState(JSON.stringify({ ...legacy, ...prefs, lastLog: read("fitmap.lastlog.v1", restoredHistory.reduce((log, w) => saveLastLog(log, w, w.finishedAt!), {})), workout: read("fitmap.workout.v1", null), history: read("fitmap.history.v1", []), routine: read("fitmap.routine.v1", legacy.routine), notes: read("fitmap-muscle-notes", legacy.notes), recent: read("fitmap-recovery-times", legacy.recent), schedule: read("fitmap.schedule.v1", migratedSchedule), log: read("fitmap.log.v1", legacy.log), skips: read("fitmap.skips.v1", legacy.skips) }));
+  const values=Object.fromEntries(entries);
+  const read=(key:string,fallback:unknown)=>{try{return values[key]?JSON.parse(values[key]!):fallback;}catch{return fallback;}};
+  if(values["fitmap.state.v2"]!==undefined && values["fitmap.state.v2"]!==null) {
+    const state = parseState(values["fitmap.state.v2"]);
+    return {...state,history:validateHistory(read("fitmap.history.v1",[]))};
+  }
+  const legacy=read(KEY,{}) as Record<string,unknown>;
+  return migrateStateV1({...legacy,...read("fitmap.prefs.v1",{}) as object, routine:read("fitmap.routine.v1",legacy.routine), workout:read("fitmap.workout.v1",null), history:read("fitmap.history.v1",[]), schedule:read("fitmap.schedule.v1",legacy.schedule), log:read("fitmap.log.v1",legacy.log), skips:read("fitmap.skips.v1",legacy.skips), notes:read("fitmap-muscle-notes",legacy.notes), recent:read("fitmap-recovery-times",legacy.recent)});
 }

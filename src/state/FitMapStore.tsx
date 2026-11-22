@@ -1,8 +1,9 @@
-import { completedSets, newWorkout, toggleSet, progressRoutine, saveLastLog, adjustRest, editWorkoutExercise, remainingSets } from "../shared/workout";
+import { finishSession, historyLog, lastExerciseLog, validateHistory } from "../shared/sessions";
+import { completedSets, newWorkout, toggleSet, progressRoutine, adjustRest, editWorkoutExercise, remainingSets } from "../shared/workout";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { names } from "../shared/body-artwork";
-import { dateKey, normalizeSchedule, normalizeSkips, type ReminderPrefs, type DayPlan } from "../notify/scheduler";
+import { normalizeSchedule, normalizeSkips, type ReminderPrefs, type DayPlan } from "../notify/scheduler";
 import type { Exercise } from "../shared/fitness";
 import { initial, KEYS, hydrateState, normalizeExercise, type State, type Theme, type Mode, type BodyView } from "./persistence";
 export type { Theme, Mode, BodyView } from "./persistence";
@@ -22,6 +23,9 @@ export const colors = {
 };
 
 type Store = State & {
+  log: ReturnType<typeof historyLog>;
+  lastLog: ReturnType<typeof lastExerciseLog>;
+  deleteSession: (id: string) => void;
   exportState: () => State;
   importState: (state: State) => void;
   startWorkout: (exercises: Exercise[]) => void;
@@ -45,7 +49,6 @@ type Store = State & {
   cycleTheme: () => void;
   setDayPlan: (day: number, plan: DayPlan) => void;
   setReminders: (prefs: ReminderPrefs) => void;
-  logWorkout: (muscles: string[]) => void;
   skipDay: (date: string) => void;
   togglePlanMuscle: (day: number, muscle: string) => void;
 };
@@ -80,20 +83,14 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
     if (!ready || !persistenceEnabled.current) return;
     writes.current = writes.current
       .then(() => AsyncStorage.multiSet([
-        ["fitmap.routine.v1", JSON.stringify(state.routine)],
-        ["fitmap.workout.v1", JSON.stringify(state.workout)],
+        ["fitmap.state.v2", JSON.stringify(state)],
         ["fitmap.history.v1", JSON.stringify(state.history)],
-        ["fitmap.lastlog.v1", JSON.stringify(state.lastLog)],
-        ["fitmap.prefs.v1", JSON.stringify({ theme: state.theme, mode: state.mode, reminders: state.reminders })],
-        ["fitmap.schedule.v1", JSON.stringify(state.schedule)],
-        ["fitmap.log.v1", JSON.stringify(state.log)],
-        ["fitmap.skips.v1", JSON.stringify(state.skips)],
-        ["fitmap-muscle-notes", JSON.stringify(state.notes)],
-        ["fitmap-recovery-times", JSON.stringify(state.recent)],
       ]))
       .then(() => setError(null))
       .catch(() => setError("Changes could not be saved to this device."));
   }, [state, ready]);
+  const derivedLog = useMemo(() => historyLog(state.history), [state.history]);
+  const derivedLastLog = useMemo(() => lastExerciseLog(state.history), [state.history]);
   const add: Store["add"] = (exercise, view, muscle) =>
     setState((old) => ({
       ...old,
@@ -104,6 +101,9 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
     <Context.Provider
       value={{
         ...state,
+        log: derivedLog,
+        lastLog: derivedLastLog,
+        deleteSession: (id) => setState(old => ({...old, history:old.history.filter(s=>s.id!==id)})),
         exportState: () => state,
         importState: (next) => setState({ ...next, reminders: { ...next.reminders, enabled: false } }),
         startWorkout: (exercises) => setState((old) => old.workout || !exercises.length ? old : { ...old, workout: newWorkout(exercises) }),
@@ -116,11 +116,10 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
         discardWorkout: () => setState((old) => ({ ...old, workout: null })),
         finishWorkout: () => setState((old) => {
           const w = old.workout; if (!w || !completedSets(w)) return old;
-          const at = Date.now(), key = dateKey(new Date(at));
+          const at = Date.now();
           const labels = w.exercises.filter((e) => w.completed[e.id]?.length).map((e) => e.muscle);
           const ids = Object.keys(names).filter((id) => labels.includes(names[id]));
-          const muscles = [...new Set([...(old.log[key]?.muscles ?? []), ...ids])];
-          return { ...old, lastLog: saveLastLog(old.lastLog, w, at), routine: progressRoutine(old.routine, w), workout: null, history: [...old.history, { ...w, restUntil: null, finishedAt: at }], log: { ...old.log, [key]: { at, muscles } }, recent: { ...old.recent, ...Object.fromEntries(ids.flatMap((id) => [[`front:${id}`, at], [`back:${id}`, at]])) } };
+          return { ...old, routine: progressRoutine(old.routine, w), workout: null, history: validateHistory([...old.history, finishSession(w,at)]), recent: { ...old.recent, ...Object.fromEntries(ids.flatMap((id) => [[`front:${id}`, at], [`back:${id}`, at]])) } };
         }),
         ready,
         error,
@@ -147,11 +146,6 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
         setDayPlan: (day, plan) => setState((old) => ({ ...old, schedule: normalizeSchedule(old.schedule.map((item, index) => index === day ? plan : item)) })),
         setReminders: (reminders) => setState((old) => ({ ...old, reminders })),
         skipDay: (date) => setState((old) => ({ ...old, skips: normalizeSkips({ ...old.skips, [date]: true }) })),
-        logWorkout: (muscles) => {
-          const at = Date.now(), key = dateKey(new Date(at));
-          const ids = muscles.filter((id) => Object.hasOwn(names, id));
-          setState((old) => ({ ...old, log: { ...old.log, [key]: { at, muscles: ids } }, recent: { ...old.recent, ...Object.fromEntries(ids.flatMap((id) => [[`front:${id}`, at], [`back:${id}`, at]])) } }));
-        },
         cycleTheme: () =>
           setState((old) => ({
             ...old,

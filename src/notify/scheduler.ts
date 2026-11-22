@@ -1,7 +1,8 @@
+import { historyLog, weekday, type Session } from "../shared/sessions";
 import { names } from "../shared/body-artwork";
 import type { Exercise } from "../shared/fitness";
 
-export type DayPlan = { enabled: boolean; hour: number; minute: number; muscles: string[] };
+export type DayPlan = { on: boolean; time: string };
 export type Schedule = DayPlan[];
 export type WorkoutLog = Record<string, { at: number; muscles: string[] }>;
 export type Skips = Record<string, boolean>;
@@ -10,12 +11,7 @@ export const MUSCLES = Object.entries(names).map(([id, label]) => ({ id, label }
 export function normalizeSchedule(value: unknown): Schedule {
   return Array.from({ length: 7 }, (_, day) => {
     const item = Array.isArray(value) ? value[day] : undefined;
-    return {
-      enabled: item?.enabled === true,
-      hour: Number.isInteger(item?.hour) && item.hour >= 0 && item.hour <= 23 ? item.hour : 18,
-      minute: Number.isInteger(item?.minute) && item.minute >= 0 && item.minute <= 59 ? item.minute : 0,
-      muscles: Array.isArray(item?.muscles) ? [...new Set<string>(item.muscles.filter((id: unknown): id is string => typeof id === "string" && Object.hasOwn(names, id)))] : [],
-    };
+    return { on: item?.on === true, time: typeof item?.time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(item.time) ? item.time : "18:00" };
   });
 }
 export function dateKey(date: Date) {
@@ -34,25 +30,26 @@ export function normalizeSkips(value: unknown): Skips {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(Object.entries(value).filter(([key, skip]) => validDateKey(key) && skip === true));
 }
-export function dayExercises(routine: Exercise[], day: DayPlan) {
-  return day.enabled ? routine.filter((exercise) => day.muscles.some((id) => names[id] === exercise.muscle)) : [];
-}
+export function dayExercises(routine: Exercise[], day: number) { return routine.filter(e => e.days?.includes(day)); }
+export function dayLabel(routine: Exercise[], day: number) { return [...new Set(dayExercises(routine,day).map(e=>e.muscle))].join(" + "); }
+export function exerciseCount(routine: Exercise[], day: number) { return dayExercises(routine,day).length; }
 export type PlannedReminder = { identifier: string; date: Date; title: string; body: string; data: { fitmap: true; date: string; screen: "routine" | "plan" } };
 export function renewalReminder(now: Date, planned: PlannedReminder[]): PlannedReminder | null {
   if (!planned.length) return null;
   const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 26, 18, 0);
   return { identifier: "fitmap.renewal", date, title: "Keep your reminders going", body: "Open FitMap to keep reminders going.", data: { fitmap: true, date: dateKey(date), screen: "plan" } };
 }
-export function planReminders({ now, routine, schedule, log, skips, prefs }: { now: Date; routine: Exercise[]; schedule: Schedule; log: WorkoutLog; skips: Skips; prefs: ReminderPrefs }): PlannedReminder[] {
+export function planReminders({ now, routine, schedule, history, skips, prefs }: { now: Date; routine: Exercise[]; schedule: Schedule; history: Session[]; skips: Skips; prefs: ReminderPrefs }): PlannedReminder[] {
   if (!prefs.enabled) return [];
-  const days = normalizeSchedule(schedule);
+  const days = normalizeSchedule(schedule), log = historyLog(history);
   const planned: PlannedReminder[] = [];
   for (let offset = 0; offset < 28; offset++) {
     const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-    const key = dateKey(date), day = days[date.getDay()];
-    const exercises = dayExercises(routine, day);
-    if (!day.enabled || !exercises.length || log[key] || skips[key]) continue;
-    date.setHours(day.hour, day.minute, 0, 0);
+    const key = dateKey(date), day = days[weekday(date)];
+    const exercises = dayExercises(routine, weekday(date));
+    if (!day.on || !exercises.length || log[key] || skips[key]) continue;
+    const [hour, minute] = day.time.split(":").map(Number);
+    date.setHours(hour, minute, 0, 0);
     if (date <= now) continue;
     const labels = [...new Set(exercises.map((exercise) => exercise.muscle))];
     planned.push({ identifier: `fitmap.plan.${key}`, date, title: "FitMap reminder", body: prefs.private ? "Your planned workout is ready to view." : `${labels.join(" + ")}: ${exercises.length} exercise${exercises.length === 1 ? "" : "s"} planned.`, data: { fitmap: true, date: key, screen: "routine" } });

@@ -1,3 +1,4 @@
+import { weekday } from "../shared/sessions";
 import { useEffect, useRef, useState, type ComponentRef } from "react";
 import { AccessibilityInfo, AppState, Modal, Pressable, ScrollView, StyleSheet, Text, Vibration, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -35,14 +36,14 @@ export default function WorkoutScreen() {
   const [previousNext, setPreviousNext] = useState(nextId);
   if (previousNext !== nextId) { setPreviousNext(nextId); setExpanded(null); }
   useEffect(() => { if (nextId) { const timer = setTimeout(() => scroll.current?.scrollTo({ y: positions.current[nextId] ?? 0, animated: !ux.reducedMotion }), 100); return () => clearTimeout(timer); } }, [nextId, ux.reducedMotion]);
-  const nextDay = (() => { for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() + i); if (store.schedule[d.getDay()]?.enabled) return `Next workout: ${d.toLocaleDateString(undefined, { weekday: "long" })}`; } return "No next workout scheduled"; })();
+  const nextDay = (() => { for (let i = 1; i <= 7; i++) { const d = new Date(); d.setDate(d.getDate() + i); if (store.schedule[weekday(d)]?.on) return `Next workout: ${d.toLocaleDateString(undefined, { weekday: "long" })}`; } return "No next workout scheduled"; })();
   if (!w) return <SafeAreaView edges={["bottom"]} style={s.root}><View style={[s.content, { flex: 1, justifyContent: "center" }]}><Text style={s.heading}>{summary ? "Workout complete" : "Ready when you are"}</Text>{summary && <><Text style={s.title}>{summary.done} of {summary.total} sets {"\u00b7"} {summary.minutes} min</Text><Text style={s.text}>{summary.updates ? `${summary.updates} exercise weights updated for next time.` : "Weights unchanged."}</Text><Text style={s.muted}>{nextDay}</Text></>}<Action label="Back to Plan" onPress={() => router.navigate("/plan")} accent={store.accent} /></View></SafeAreaView>;
   const done = completedSets(w), total = w.exercises.reduce((n, e) => n + e.sets, 0), left = total - done;
   const title = [...new Set(w.exercises.map(e => e.muscle))].join(" + ");
   const excluded = store.routine.filter(e => !w.exercises.some(x => x.id === e.id));
   const upcoming = w.exercises.filter(e => !w.skipped?.includes(e.id) && (w.completed[e.id]?.length ?? 0) < e.sets)[1];
   const finish = () => { const updated = progressRoutine(store.routine, w); const result = { done, total, minutes: Math.max(1, Math.round((Date.now() - w.startedAt) / 60000)), updates: updated.filter((e, i) => e.weight !== store.routine[i].weight).length }; store.finishWorkout(); setSummary(result); setConfirm(null); };
-  const candidates: Exercise[] = Object.entries(EXERCISES).flatMap(([muscle, items]) => items.map(e => ({ ...e, muscle: names[muscle], sets: 3, reps: 10, weight: 0, progression: 2.5 }))).filter((e, i, all) => !w.exercises.some(x => x.id === e.id) && all.findIndex(x => x.id === e.id) === i);
+  const candidates: Exercise[] = Object.entries(EXERCISES).flatMap(([muscle, items]) => items.map(e => ({ ...e, muscle: names[muscle], days: [], sets: 3, reps: 10, weight: 0, progression: 2.5 }))).filter((e, i, all) => !w.exercises.some(x => x.id === e.id) && all.findIndex(x => x.id === e.id) === i);
   return <SafeAreaView edges={["bottom"]} style={s.root}>
     <View style={s.header}><Pressable accessibilityRole="button" accessibilityLabel="Back to routine" onPress={() => router.navigate("/routine")} style={s.icon}><Text style={s.title}>{"\u2190"}</Text></Pressable><View style={{ flex: 1 }}><Text accessibilityRole="header" style={s.title}>{title}</Text><Text style={s.muted}>{done}/{total} sets {"\u00b7"} <Elapsed start={w.startedAt} /></Text></View><Pressable accessibilityRole="button" accessibilityLabel="Workout menu" onPress={() => setMenu(true)} style={s.icon}><Text style={s.title}>{"\u22ee"}</Text></Pressable></View>
     <ScrollView ref={scroll} contentContainerStyle={s.content}>

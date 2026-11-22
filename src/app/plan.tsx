@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Choice } from "../components/Controls";
 import { colors, useFitMap } from "../state/FitMapStore";
-import { WEEKDAYS } from "../shared/weekly-plan";
+import { DAYS as WEEKDAYS, weekday } from "../shared/sessions";
 import { MUSCLES, dateKey, dayExercises, type DayPlan } from "../notify/scheduler";
 import { useReminderControls } from "../notify/useReminders";
 
@@ -16,7 +16,7 @@ function TimePicker({ day, plan, onChange }: { day: string; plan: DayPlan; onCha
   const [minute, setMinute] = useState("");
   const valid = /^\d{1,2}$/.test(hour) && +hour < 24 && /^\d{1,2}$/.test(minute) && +minute < 60;
   return <>
-    <Choice label={`${day} time: ${String(plan.hour).padStart(2, "0")}:${String(plan.minute).padStart(2, "0")}`} onPress={() => { setHour(String(plan.hour)); setMinute(String(plan.minute).padStart(2, "0")); setOpen(true); }} />
+    <Choice label={`${day} time: ${String(Number(plan.time.split(":")[0])).padStart(2, "0")}:${String(Number(plan.time.split(":")[1])).padStart(2, "0")}`} onPress={() => { setHour(String(Number(plan.time.split(":")[0]))); setMinute(String(Number(plan.time.split(":")[1])).padStart(2, "0")); setOpen(true); }} />
     <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
       <View style={s.overlay}><View accessibilityViewIsModal style={[s.card, s.dialog]}>
         <Text style={s.heading}>{day} reminder time</Text><Text style={s.muted}>24-hour time</Text>
@@ -26,7 +26,7 @@ function TimePicker({ day, plan, onChange }: { day: string; plan: DayPlan; onCha
           <View><Text style={s.body}>Minute</Text><TextInput accessibilityLabel="Minute, 0 to 59" keyboardType="number-pad" maxLength={2} selectTextOnFocus value={minute} onChangeText={setMinute} style={s.input} /></View>
         </View>
         {!valid && <Text style={s.error}>Enter an hour from 0 to 23 and a minute from 0 to 59.</Text>}
-        <Action label="Save time" disabled={!valid} onPress={() => { onChange({ ...plan, hour: +hour, minute: +minute }); setOpen(false); }} />
+        <Action label="Save time" disabled={!valid} onPress={() => { onChange({ ...plan, time: `${hour.padStart(2,"0")}:${minute.padStart(2,"0")}` }); setOpen(false); }} />
         <Choice label="Cancel" onPress={() => setOpen(false)} />
       </View></View>
     </Modal>
@@ -46,20 +46,20 @@ export default function PlanScreen() {
     const subscription = AppState.addEventListener("change", (state) => { if (state === "active") refresh(); });
     return () => { clearInterval(timer); subscription.remove(); };
   }, []);
-  const today = now.getDay(), key = dateKey(now), plan = store.schedule[today];
-  const exercises = dayExercises(store.routine, plan);
+  const today = weekday(now), key = dateKey(now), plan = store.schedule[today];
+  const exercises = plan.on ? dayExercises(store.routine, today) : [];
   const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
   return <SafeAreaView style={s.screen} edges={["left", "right"]}><GuideScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     <Text style={s.title}>Plan</Text>
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
     <View style={[s.card, { borderColor: store.accent }]}>
       <Text style={[s.eyebrow, { color: store.accent }]}>TODAY / {WEEKDAYS[today].toUpperCase()}</Text>
-      <Text style={s.heading}>{!plan.enabled ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
+      <Text style={s.heading}>{!plan.on ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
       <Text style={s.muted}>{exercises.length} exercises{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
       {exercises.map((exercise) => <Text key={exercise.id} style={s.body}>{exercise.name} / {exercise.sets} x {exercise.reps}</Text>)}
       <WorkoutEntry exercises={exercises} />
       <Choice label="Open routine" onPress={() => router.navigate("/routine")} />
-      <Action label={store.log[key] ? "Logged \u2713" : "Log workout"} disabled={!!store.log[key] || !exercises.length} onPress={() => store.logWorkout(trained.map(({ id }) => id))} />
+
     </View>
     <View style={s.card}>
       <View style={s.row}><Text style={[s.heading, s.grow]}>Reminders</Text><Switch accessibilityLabel="Enable reminders" value={store.reminders.enabled} disabled={!controls.available || controls.busy} onValueChange={(value) => void controls.enable(value)} trackColor={{ true: store.accent }} style={s.switch} /></View>
@@ -73,11 +73,11 @@ export default function PlanScreen() {
       {controls.error && <><Text accessibilityRole="alert" style={s.error}>{controls.error}</Text><Choice label="Retry reminders" onPress={controls.retry} /></>}
     </View>
     <Text style={s.heading}>Your week</Text><Text style={s.muted}>Enable days, choose a time, and select muscle groups. Each day includes their saved routine exercises.</Text>
-    {[1, 2, 3, 4, 5, 6, 0].map((day) => {
+    {[0, 1, 2, 3, 4, 5, 6].map((day) => {
       const item = store.schedule[day], label = WEEKDAYS[day];
       return <View key={day} style={s.card}>
-        <View style={s.row}><Text style={[s.heading, s.grow]}>{label}</Text><Switch accessibilityLabel={`${label} workout`} value={item.enabled} onValueChange={(enabled) => store.setDayPlan(day, { ...item, enabled })} trackColor={{ true: store.accent }} style={s.switch} /></View>
-        {item.enabled ? <><TimePicker day={label} plan={item} onChange={(value) => store.setDayPlan(day, value)} /><View style={s.chips}>{MUSCLES.map(({ id, label: muscle }) => <Choice key={id} label={muscle} active={item.muscles.includes(id)} onPress={() => store.setDayPlan(day, { ...item, muscles: item.muscles.includes(id) ? item.muscles.filter((value) => value !== id) : [...item.muscles, id] })} />)}</View><Text style={s.muted}>{dayExercises(store.routine, item).length} exercises in your routine</Text></> : <Text style={s.muted}>Rest day</Text>}
+        <View style={s.row}><Text style={[s.heading, s.grow]}>{label}</Text><Switch accessibilityLabel={`${label} workout`} value={item.on} onValueChange={(enabled) => store.setDayPlan(day, { ...item, on: enabled })} trackColor={{ true: store.accent }} style={s.switch} /></View>
+        {item.on ? <><TimePicker day={label} plan={item} onChange={(value) => store.setDayPlan(day, value)} /><View style={s.chips}>{MUSCLES.map(({ id, label: muscle }) => <Choice key={id} label={muscle} active={dayExercises(store.routine, day).some(e=>e.muscle===muscle)} onPress={() => { const assigned=dayExercises(store.routine,day).some(e=>e.muscle===muscle); store.routine.filter(e=>e.muscle===muscle).forEach(e=>store.update({...e,days:assigned?e.days.filter(d=>d!==day):[...e.days,day]})); }} />)}</View><Text style={s.muted}>{dayExercises(store.routine, day).length} exercises in your routine</Text></> : <Text style={s.muted}>Rest day</Text>}
       </View>;
     })}
     <Text style={s.muted}>For general fitness information only.</Text>

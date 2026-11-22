@@ -15,7 +15,7 @@ export function editWorkoutExercise(w: Workout, id: string, patch: Partial<Pick<
   return { ...w, originalWeights: { ...Object.fromEntries(w.exercises.map(e => [e.id, e.weight])), ...w.originalWeights }, exercises: w.exercises.map(e => e.id === id ? { ...e, ...patch, weight: e.equipment.toLowerCase() === "bodyweight" ? 0 : normalizeWeight(patch.weight ?? e.weight), reps: Math.max(1, Math.min(999, Math.round(patch.reps ?? e.reps))) } : e) };
 }
 export function newWorkout(exercises: Exercise[], now = Date.now()): Workout {
-  return { id: String(now), startedAt: now, exercises: exercises.map((exercise) => ({ ...exercise })), completed: Object.fromEntries(exercises.map((exercise) => [exercise.id, []])), restUntil: null };
+  return { id: `${now}-${Math.random().toString(36).slice(2, 10)}`, startedAt: now, exercises: exercises.map((exercise) => ({ ...exercise, days: [...(exercise.days ?? [])] })), completed: Object.fromEntries(exercises.map((exercise) => [exercise.id, []])), restUntil: null };
 }
 export function toggleSet(workout: Workout, id: string, index: number, now = Date.now()): Workout {
   const exercise = workout.exercises.find((item) => item.id === id);
