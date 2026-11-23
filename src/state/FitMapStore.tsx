@@ -1,3 +1,4 @@
+import { insertSessionExercise } from "../shared/session-picker";
 import { copyDay } from "../shared/plan-layout";
 import { finishSession, historyLog, lastExerciseLog, validateHistory } from "../shared/sessions";
 import { completedSets, newWorkout, toggleSet, progressRoutine, adjustRest, editWorkoutExercise, remainingSets } from "../shared/workout";
@@ -42,6 +43,7 @@ type Store = State & {
   stopRest: () => void;
   adjustRest: (seconds: number) => void;
   editWorkout: (id: string, patch: Partial<Pick<Exercise, "weight" | "reps" | "progression">>) => void;
+  addWorkoutExercise: (exercise: Exercise, after?: string, day?: number) => void;
   includeExercises: (exercises: Exercise[]) => void;
   skipExercise: (id: string) => void;
   discardWorkout: () => void;
@@ -129,6 +131,15 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
         stopRest: () => setState((old) => old.workout ? { ...old, workout: { ...old.workout, restUntil: null } } : old),
         adjustRest: (seconds) => setState(old => old.workout ? { ...old, workout: adjustRest(old.workout, seconds) } : old),
         editWorkout: (id, patch) => setState(old => old.workout ? { ...old, workout: editWorkoutExercise(old.workout, id, patch) } : old),
+        addWorkoutExercise: (exercise, after, day) => setState(old => {
+          if (!old.workout) return old;
+          const e = normalizeExercise(exercise), workout = insertSessionExercise(old.workout, e, after);
+          if (workout === old.workout) return old;
+          if (day === undefined || !Number.isInteger(day) || day < 0 || day > 6) return { ...old, workout };
+          const existing = old.routine.find(x => x.id === e.id);
+          const entry = { ...(existing ?? e), days: [...new Set([...(existing?.days ?? []),day])].sort() };
+          return { ...old, workout, routine: existing ? old.routine.map(x => x.id === e.id ? entry : x) : [...old.routine,entry], schedule: old.schedule.map((p,i)=>i === day ? {...p,on:true} : p) };
+        }),
         includeExercises: (exercises) => setState(old => { if (!old.workout) return old; const added = exercises.filter(e => !old.workout!.exercises.some(x => x.id === e.id)); return { ...old, workout: { ...old.workout, exercises: [...old.workout.exercises, ...added.map(e => ({...e}))], completed: { ...old.workout.completed, ...Object.fromEntries(added.map(e => [e.id, []])) } } }; }),
         skipExercise: (id) => setState(old => { if (!old.workout) return old; const w = { ...old.workout, skipped: [...new Set([...(old.workout.skipped ?? []), id])] }; return { ...old, workout: { ...w, restUntil: remainingSets(w) ? w.restUntil : null } }; }),
         discardWorkout: () => setState((old) => ({ ...old, workout: null })),

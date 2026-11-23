@@ -4,6 +4,7 @@ const { todayCard, weekDates, copyDay } = require('../src/shared/plan-layout.ts'
 const { initial } = require('../src/state/persistence.ts');
 const { newWorkout, toggleSet } = require('../src/shared/workout.ts');
 const { finishSession, localDate } = require('../src/shared/sessions.ts');
+const { insertSessionExercise } = require('../src/shared/session-picker.ts');
 const e = { id:'bench',name:'Bench Press',muscle:'Chest',equipment:'Barbell',sets:3,reps:8,weight:15,progression:2.5,days:[0] };
 test('Today card precedence: running, done, planned, nothing planned', () => {
   const now = new Date(2026,10,23,12), base = {...initial,now,routine:[e]}, planned = {...base,schedule:base.schedule.map((p,i)=>({...p,on:i===0}))};
@@ -31,4 +32,14 @@ test('day copy replaces destination only, preserves source, values and snapshots
   assert.deepEqual(copyDay(routine,schedule,0,0),{routine,schedule});
   assert.deepEqual(copyDay(routine,schedule,0,9),{routine,schedule});
   assert.ok(initial.schedule.every(p=>!p.on));
+});
+test('model picker inserts after current, keeps session and set progress, rejects duplicates', () => {
+  const w = toggleSet(newWorkout([e,{...e,id:'last'}],1000),e.id,0,1000);
+  const added = {...e,id:'new'}, next = insertSessionExercise(w,added,e.id);
+  assert.deepEqual(next.exercises.map(e=>e.id),['bench','new','last']);
+  assert.equal(next.id,w.id); assert.equal(next.restUntil,w.restUntil);
+  assert.deepEqual(next.completed.bench,[0]); assert.deepEqual(next.completed.new,[]);
+  assert.equal(insertSessionExercise(next,added,e.id),next);
+  added.days.push(3); assert.deepEqual(next.exercises[1].days,[0]);
+  assert.equal(w.exercises.length,2);
 });

@@ -1,3 +1,4 @@
+import type { SessionPicker } from "../shared/session-picker";
 import { DAYS } from "../shared/sessions";
 import { router, usePathname } from "expo-router";
 import WorkoutEntry from "../components/WorkoutEntry";
@@ -16,11 +17,11 @@ import { Choice } from "../components/Controls";
 import { colors, useFitMap, type BodyView, type Mode } from "../state/FitMapStore";
 import { OneTimeHint, Pulse, TourTarget, useExperience } from "../state/Experience";
 
-export default function BodyScreen() {
+export default function BodyScreen({ picker }: { picker?: SessionPicker } = {}) {
   const store = useFitMap(), ux = useExperience(), path=usePathname();
-  const target=store.targetWeekday;
+  const target=picker ? null : store.targetWeekday;
   const doneDay=()=>{store.endDay();router.navigate("/plan");};
-  useEffect(()=>{if(target===null || path!=="/")return;const sub=BackHandler.addEventListener("hardwareBackPress",()=>{doneDay();return true;});return()=>sub.remove();});
+  useEffect(()=>{if (picker) return; if(target===null || path!=="/")return;const sub=BackHandler.addEventListener("hardwareBackPress",()=>{doneDay();return true;});return()=>sub.remove();});
   const [angle, setAngle] = useState(0), [depth, setDepth] = useState(true), [browse, setBrowse] = useState(false), [layers, setLayers] = useState(false);
   const [selected, setSelected] = useState<{ id: string; view: BodyView } | null>(null), [expanded, setExpanded] = useState(false), [part, setPart] = useState<string | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -28,7 +29,7 @@ export default function BodyScreen() {
   const [animatedCamera, setCamera] = useState(targetCamera), cameraRef = useRef(animatedCamera), blurTarget = useRef<ComponentRef<typeof View>>(null);
   const camera = ux.reducedMotion ? targetCamera : animatedCamera;
   const view = sideAtAngle(angle), unlocked = ux.guide.unlocked || store.routine.length > 0;
-  const mode = target!==null ? "map" : unlocked ? store.mode : "map";
+  const mode = picker || target!==null ? "map" : unlocked ? store.mode : "map";
   useEffect(() => {
     if (ux.reducedMotion) { cameraRef.current = targetCamera; return; }
     const start = performance.now(), from = cameraRef.current; let frame = 0;
@@ -55,10 +56,11 @@ export default function BodyScreen() {
   const hintKey = `mode-${mode}`;
   const showHint = mode !== "map" && (!ux.active || !ux.step) && ux.ready;
   return <SafeAreaView style={s.screen} edges={["left", "right"]}>
-    <View style={s.header}><Text style={[s.logo, { color: store.accent }]}>FIT<Text style={{ color: colors.text }}>MAP</Text></Text>{target===null && <Choice label="Menu" onPress={() => setLayers(true)} />}</View>
+    <View style={s.header}><Text style={[s.logo, { color: store.accent }]}>FIT<Text style={{ color: colors.text }}>MAP</Text></Text>{!picker && target===null && <Choice label="Menu" onPress={() => setLayers(true)} />}</View>
     {target!==null && <View style={[s.row,{paddingVertical:8,justifyContent:"space-between"}]}><Text style={{color:store.accent,fontWeight:"700",flexShrink:1}}>Adding to {DAYS[target]}</Text><Choice label="Done" onPress={doneDay} /></View>}
+    {picker && <View style={[s.row,{paddingVertical:8,justifyContent:"space-between"}]}><View style={{flex:1}}><Text style={{color:colors.text,fontWeight:"700"}}>Adding to today&apos;s workout</Text><Text accessibilityLiveRegion="polite" style={s.hint}>{picker.added} added</Text></View><Choice label="Done" onPress={picker.onDone}/></View>}
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
-    {unlocked && target===null && <View style={s.modes} accessibilityRole="radiogroup">{([["map", "Muscles"], ["heatmap", "Heatmap"], ["recovery", "Recent"], ["constellation", "Connect"]] as [Mode, string][]).map(([value, label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: mode === value }} aria-checked={mode === value} onPress={() => store.setMode(value)} style={[s.mode, mode === value && { backgroundColor: store.accent }]}><Text style={[s.modeText, mode === value && { color: "#101215" }]}>{label}</Text></Pressable>)}</View>}
+    {unlocked && !picker && target===null && <View style={s.modes} accessibilityRole="radiogroup">{([["map", "Muscles"], ["heatmap", "Heatmap"], ["recovery", "Recent"], ["constellation", "Connect"]] as [Mode, string][]).map(([value, label]) => <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: mode === value }} aria-checked={mode === value} onPress={() => store.setMode(value)} style={[s.mode, mode === value && { backgroundColor: store.accent }]}><Text style={[s.modeText, mode === value && { color: "#101215" }]}>{label}</Text></Pressable>)}</View>}
     {showHint && <OneTimeHint key={hintKey} name={hintKey} message={hints[mode] ?? ""}><View style={s.row}>{!store.routine.length && <Choice label="Add exercises" onPress={() => { store.setMode("map"); setBrowse(true); }} />}</View></OneTimeHint>}
     <TourTarget name="muscle"><Pressable accessibilityRole="button" accessibilityState={{ expanded: browse }} onPress={() => setBrowse(!browse)} style={s.browse}><Text style={s.browseLabel}>{browse ? "Hide muscle list" : "\u2637 Choose muscle by name"}</Text></Pressable></TourTarget>
     {browse && <View><View style={s.row}><Choice label="Show front muscles" active={view === "front"} onPress={() => turn("front")} /><Choice label="Show back muscles" active={view === "back"} onPress={() => turn("back")} /></View><ScrollView horizontal style={s.names} contentContainerStyle={{ gap: 7 }}>{ids.map((id) => <Choice key={id} label={names[id]} onPress={() => pick(id, view)} />)}</ScrollView></View>}
@@ -73,11 +75,11 @@ export default function BodyScreen() {
             <Circle cx={size.width / 2} cy={edge} r={4} fill={store.accent} />
           </Svg>
           {pinVisible && <View testID="muscle-pin" pointerEvents="none" style={{ position: "absolute", left: pin.x - 12, top: pin.y - 12 }}><Pulse size={24} /><View style={{ position: "absolute", left: 9, top: 9, width: 6, height: 6, borderRadius: 3, backgroundColor: "white" }} /></View>}
-          <ExerciseSheet key={`${selected.view}:${selected.id}`} {...selected} onClose={clear} top={card.top} height={card.height} expanded={expanded} onExpand={() => setExpanded(!expanded)} blurTarget={blurTarget} part={part} setPart={setPart} />
+          <ExerciseSheet picker={picker} key={`${selected.view}:${selected.id}`} {...selected} onClose={clear} top={card.top} height={card.height} expanded={expanded} onExpand={() => setExpanded(!expanded)} blurTarget={blurTarget} part={part} setPart={setPart} />
         </>}
       </View>
     </TourTarget>
-    {target===null && <WorkoutEntry pill />}
+    {!picker && target===null && <WorkoutEntry pill />}
     <Text style={s.hint}>Tap a muscle to see exercises</Text>
     <View style={s.center}>{(["front", "back"] as const).map((side) => <Choice key={side} label={side === "front" ? "Front" : "Back"} active={view === side} onPress={() => turn(side)} />)}</View>
     <Text style={s.disclaimer}>For general fitness information only.</Text>
