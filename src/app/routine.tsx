@@ -69,7 +69,7 @@ export default function RoutineScreen() {
         <View style={s.header}>
           <Text style={s.title}>Your routine</Text>
           <Text style={s.muted}>
-            {store.routine.length} exercises · {store.routine.reduce((n, x) => n + x.sets, 0)} total
+            {store.routine.length} {store.routine.length === 1 ? "exercise" : "exercises"} · {store.routine.reduce((n, x) => n + x.sets, 0)} total
             sets
           </Text>
         </View>

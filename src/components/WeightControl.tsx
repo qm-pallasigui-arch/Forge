@@ -31,7 +31,7 @@ export default function WeightControl({ exercise, featured = false, onChange }: 
     setDraft(null);
   };
   const open = expanded;
-  const summary = <Pressable accessibilityRole="button" accessibilityLabel={`Edit weight for ${exercise.name}`} accessibilityState={{ expanded: open }} onPress={() => setExpanded(!open)} style={s.summary}><Text style={s.label}>{exercise.weight} kg {"\u00b7"} {exercise.progression ? `+${exercise.progression} next` : "same weight next"}</Text><Text style={s.note}>{open ? "Collapse" : "Edit"}</Text></Pressable>;
+  const summary = <Pressable accessibilityRole="button" accessibilityLabel={`Edit weight for ${exercise.name}`} accessibilityState={{ expanded: open }} onPress={() => setExpanded(!open)} style={s.summary}><View><Text style={s.label}>Weight {exercise.weight} kg</Text><Text style={s.note}>Next workout: {exercise.progression ? `+${exercise.progression} kg` : "same weight"}</Text></View><Text style={s.note}>{open ? "Collapse" : "Edit"}</Text></Pressable>;
   const wrap = (children: React.ReactNode) => featured ? <TourTarget name="weight">{children}</TourTarget> : children;
   return <View style={s.container}>
     {!open ? wrap(summary) : summary}
@@ -55,7 +55,7 @@ export default function WeightControl({ exercise, featured = false, onChange }: 
     </>}
     <Text style={s.label}>Next-workout increase</Text>
     <View style={s.row} accessibilityRole="radiogroup">{[0, 0.5, 1, 2.5, 5].map((step) => <Pressable key={step} accessibilityRole="radio" accessibilityLabel={`${step} kilograms next workout`} accessibilityState={{ checked: exercise.progression === step }} aria-checked={exercise.progression === step} onPress={() => update({ ...exercise, progression: step })} style={[s.plate, exercise.progression === step && { borderColor: accent }]}><Text style={[s.label, exercise.progression === step && { color: accent }]}>{step === 0 ? "Same" : `+${step}`}</Text></Pressable>)}</View>
-    <Text style={[s.note, { color: accent }]}>{normalizeWeight(exercise.weight + exercise.progression)} kg next target</Text>
+    <Text style={s.note}>{normalizeWeight(exercise.weight + exercise.progression)} kg next target</Text>
     </>}
   </View>;
 }

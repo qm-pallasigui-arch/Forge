@@ -60,25 +60,25 @@ export default function PlanScreen() {
   const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
   return <SafeAreaView style={s.screen} edges={["left", "right"]}><View style={{padding:16,gap:10}}><Text style={s.title}>Plan</Text><View style={s.row}><Choice label="Week" active={section==="week"} onPress={()=>setSection("week")}/><Choice label="History" active={section==="history"} onPress={()=>{setSection("history");setSelectedSession(null);}}/></View></View>{section==="history"?<HistoryPanel selectedId={selectedSession} onSelect={setSelectedSession} now={now}/>:<GuideScrollView scrollRef={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
-    <View style={[s.card, { borderColor: store.accent }]}>
+    <View style={s.card}>
       <Text style={[s.eyebrow, { color: store.accent }]}>TODAY / {WEEKDAYS[today].toUpperCase()}</Text>
       <Text style={s.heading}>{!plan.on ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
-      <Text style={s.muted}>{exercises.length} exercises{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
+      <Text style={s.muted}>{exercises.length} {exercises.length === 1 ? "exercise" : "exercises"}{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
       {exercises.map((exercise) => <Text key={exercise.id} style={s.body}>{exercise.name} / {exercise.sets} x {exercise.reps}</Text>)}
       {entry.latest && <><Text style={s.body}>Logged {"\u2713"} {"\u00b7"} {entry.minutes} min</Text><Choice label="View summary" onPress={()=>{setSelectedSession(entry.latest!.id);setSection("history");}} /></>}
       {!exercises.length && <Choice label="Add workout" onPress={()=>addToDay(today)} />}
-      {!exercises.length && entry.exercises.length>0 && <Text style={s.muted}>Whole routine: {entry.exercises.length} exercises available</Text>}
+      {!exercises.length && entry.exercises.length>0 && <Text style={s.muted}>Whole routine: {entry.exercises.length} {entry.exercises.length === 1 ? "exercise" : "exercises"} available</Text>}
       <WorkoutEntry />
       <Choice label="Open routine" onPress={() => router.navigate("/routine")} />
 
     </View>
     <View style={s.card}>
-      <View style={s.row}><Text style={[s.heading, s.grow]}>Reminders</Text><Switch accessibilityLabel="Enable reminders" value={store.reminders.enabled} disabled={!controls.available || controls.busy} onValueChange={(value) => void controls.enable(value)} trackColor={{ true: store.accent }} style={s.switch} /></View>
+      <View style={s.row}><Text style={[s.heading, s.grow]}>Reminders</Text><Switch accessibilityLabel="Enable reminders" value={store.reminders.enabled} disabled={!controls.available || controls.busy} onValueChange={(value) => void controls.enable(value)} thumbColor="#ffffff" trackColor={{ false: colors.border, true: store.accent }} style={s.switch} /></View>
       <Text style={s.muted}>Local reminders for the next 28 days. Opening FitMap refreshes your schedule. A final reminder asks you to reopen FitMap before the window ends.</Text>
       {!controls.available && <Text style={s.muted}>Reminders require the updated native app.</Text>}
       {controls.available && controls.permission !== "granted" && controls.permission !== "denied" && <Action label="Enable notifications" disabled={controls.busy} onPress={() => void controls.enable(true)} />}
       {controls.permission === "denied" && <><Text style={s.body}>Turn on notifications in Android Settings, Apps, FitMap, Notifications</Text><Choice label="Open notification settings" onPress={() => void Linking.openSettings()} /></>}
-      <View style={s.row}><Text style={[s.body, s.grow]}>Hide workout details in notifications</Text><Switch accessibilityLabel="Hide workout details in notifications" value={store.reminders.private} onValueChange={(value) => store.setReminders({ ...store.reminders, private: value })} trackColor={{ true: store.accent }} style={s.switch} /></View>
+      <View style={s.row}><Text style={[s.body, s.grow]}>Hide workout details in notifications</Text><Switch accessibilityLabel="Hide workout details in notifications" value={store.reminders.private} onValueChange={(value) => store.setReminders({ ...store.reminders, private: value })} thumbColor="#ffffff" trackColor={{ false: colors.border, true: store.accent }} style={s.switch} /></View>
       <Action label="Send test notification" disabled={!controls.available || controls.permission !== "granted" || controls.busy} onPress={() => { setTestSent(false); void controls.test().then((sent) => setTestSent(!!sent)); }} />
       {testSent && <Text accessibilityLiveRegion="polite" style={s.muted}>Test scheduled for about 5 seconds from now.</Text>}
       {controls.error && <><Text accessibilityRole="alert" style={s.error}>{controls.error}</Text><Choice label="Retry reminders" onPress={controls.retry} /></>}
