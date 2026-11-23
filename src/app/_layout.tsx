@@ -1,4 +1,4 @@
-import { ExperienceProvider, ExperienceSurface, TourTarget } from "../state/Experience";
+import { ExperienceProvider, ExperienceSurface } from "../state/Experience";
 import TabIcon from "../components/TabIcon";
 import { ReminderProvider } from "../notify/useReminders";
 import { Tabs } from "expo-router";
@@ -37,15 +37,9 @@ function Navigation() {
             tabBarIcon: ({ color }) => <TabIcon name="body" color={color} />,
           }}
         />
-        <Tabs.Screen
-          name="routine"
-          options={{
-            title: "Routine",
-            tabBarBadge: store.routine.length || undefined,
-            tabBarIcon: ({ color }) => <TourTarget name="routine" style={{ minWidth: 52, minHeight: 36, alignItems: "center", justifyContent: "center" }}><TabIcon name="routine" color={color} /></TourTarget>,
-          }}
-        />
-        <Tabs.Screen name="plan" options={{ title: "Plan", tabBarIcon: ({ color }) => <TabIcon name="plan" color={color} /> }} />
+        <Tabs.Screen name="plan" options={{ title: "Plan", tabBarBadge: store.workout ? " " : undefined, tabBarIcon: ({ color }) => <TabIcon name="plan" color={color} /> }} />
+        <Tabs.Screen name="history" options={{ title: "History", tabBarIcon: ({ color }) => <TabIcon name="history" color={color} /> }} />
+        <Tabs.Screen name="routine" options={{ tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
         <Tabs.Screen name="workout" options={{ tabBarStyle: { display: "none" }, tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
         <Tabs.Screen name="backup" options={{ tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
       </Tabs>

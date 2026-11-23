@@ -1,24 +1,23 @@
-import HistoryPanel from "../components/HistoryPanel";
-import { workoutEntryState } from "../shared/workout-entry";
-import WorkoutEntry from "../components/WorkoutEntry";
-import { GuideScrollView, useExperience } from "../state/Experience";
-import { useEffect, useState, useRef, useCallback, type ComponentRef } from "react";
-import { AppState, Linking, Modal, Pressable, StyleSheet, Switch, ScrollView, Text, TextInput, View } from "react-native";
-import { router, usePathname, useFocusEffect } from "expo-router";
+import { useEffect, useRef, useState, type ComponentRef } from "react";
+import { AppState, Linking, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { router, usePathname } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Choice } from "../components/Controls";
+import DayExercise from "../components/DayExercise";
+import { GuideScrollView, GuideTarget, useExperience } from "../state/Experience";
 import { colors, useFitMap } from "../state/FitMapStore";
-import { DAYS as WEEKDAYS, weekday } from "../shared/sessions";
-import { MUSCLES, dateKey, dayExercises, type DayPlan } from "../notify/scheduler";
+import { DAYS, localDate, weekday } from "../shared/sessions";
+import { todayCard, weekDates } from "../shared/plan-layout";
+import { completedSets } from "../shared/workout";
+import { dayExercises, dayLabel, planReminders, type DayPlan } from "../notify/scheduler";
 import { useReminderControls } from "../notify/useReminders";
-
 function TimePicker({ day, plan, onChange }: { day: string; plan: DayPlan; onChange: (plan: DayPlan) => void }) {
   const [open, setOpen] = useState(false);
   const [hour, setHour] = useState("");
   const [minute, setMinute] = useState("");
   const valid = /^\d{1,2}$/.test(hour) && +hour < 24 && /^\d{1,2}$/.test(minute) && +minute < 60;
   return <>
-    <Choice label={`${day} time: ${String(Number(plan.time.split(":")[0])).padStart(2, "0")}:${String(Number(plan.time.split(":")[1])).padStart(2, "0")}`} onPress={() => { setHour(String(Number(plan.time.split(":")[0]))); setMinute(String(Number(plan.time.split(":")[1])).padStart(2, "0")); setOpen(true); }} />
+    <Choice label={`\u25f7 ${plan.time}`} onPress={() => { setHour(String(Number(plan.time.split(":")[0]))); setMinute(String(Number(plan.time.split(":")[1])).padStart(2, "0")); setOpen(true); }} />
     <Modal visible={open} transparent animationType="none" onRequestClose={() => setOpen(false)}>
       <View style={s.overlay}><View accessibilityViewIsModal style={[s.card, s.dialog]}>
         <Text style={s.heading}>{day} reminder time</Text><Text style={s.muted}>24-hour time</Text>
@@ -38,65 +37,58 @@ function Action({ label, onPress, disabled = false }: { label: string; onPress: 
   const { accent } = useFitMap();
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[s.action, { backgroundColor: accent, opacity: disabled ? 0.5 : 1 }]}><Text style={s.actionText}>{label}</Text></Pressable>;
 }
-export default function PlanScreen() {
-  const store = useFitMap(), controls = useReminderControls(), ux=useExperience(), path=usePathname();
-  const scroll=useRef<ComponentRef<typeof ScrollView>>(null), positions=useRef<Record<number,number>>({});
-  const returnDay=store.returnWeekday;
-  useEffect(()=>{if(path!=="/plan"||returnDay===null)return;const timer=setTimeout(()=>scroll.current?.scrollTo({y:positions.current[returnDay]??0,animated:!ux.reducedMotion}),150);return()=>clearTimeout(timer);},[path,returnDay,ux.reducedMotion]);
-  const addToDay=(day:number)=>{store.beginDay(day);router.navigate("/");};
-  const [now, setNow] = useState(() => new Date());
-  const [testSent, setTestSent] = useState(false);
-  useEffect(() => {
-    const refresh = () => setNow(new Date());
-    const timer = setInterval(refresh, 60000);
-    const subscription = AppState.addEventListener("change", (state) => { if (state === "active") refresh(); });
-    return () => { clearInterval(timer); subscription.remove(); };
-  }, []);
-  const today = weekday(now), key = dateKey(now), plan = store.schedule[today];
-  const exercises = plan.on ? dayExercises(store.routine, today) : [];
-  const entry = workoutEntryState({...store,now});
-  const [section,setSection] = useState<"week"|"history">("week"), [selectedSession,setSelectedSession] = useState<string|null>(null);
-  useFocusEffect(useCallback(()=>{setSection("week");},[]));
-  const trained = MUSCLES.filter(({ label }) => exercises.some((exercise) => exercise.muscle === label));
-  return <SafeAreaView style={s.screen} edges={["left", "right"]}><View style={{padding:16,gap:10}}><Text style={s.title}>Plan</Text><View style={s.row}><Choice label="Week" active={section==="week"} onPress={()=>setSection("week")}/><Choice label="History" active={section==="history"} onPress={()=>{setSection("history");setSelectedSession(null);}}/></View></View>{section==="history"?<HistoryPanel selectedId={selectedSession} onSelect={setSelectedSession} now={now}/>:<GuideScrollView scrollRef={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-    {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
-    <View style={s.card}>
-      <Text style={[s.eyebrow, { color: store.accent }]}>TODAY / {WEEKDAYS[today].toUpperCase()}</Text>
-      <Text style={s.heading}>{!plan.on ? "Rest day" : trained.length ? trained.map(({ label }) => label).join(" + ") : "No exercises planned"}</Text>
-      <Text style={s.muted}>{exercises.length} {exercises.length === 1 ? "exercise" : "exercises"}{store.skips[key] ? " / Reminder skipped today" : ""}</Text>
-      {exercises.map((exercise) => <Text key={exercise.id} style={s.body}>{exercise.name} / {exercise.sets} x {exercise.reps}</Text>)}
-      {entry.latest && <><Text style={s.body}>Logged {"\u2713"} {"\u00b7"} {entry.minutes} min</Text><Choice label="View summary" onPress={()=>{setSelectedSession(entry.latest!.id);setSection("history");}} /></>}
-      {!exercises.length && <Choice label="Add workout" onPress={()=>addToDay(today)} />}
-      {!exercises.length && entry.exercises.length>0 && <Text style={s.muted}>Whole routine: {entry.exercises.length} {entry.exercises.length === 1 ? "exercise" : "exercises"} available</Text>}
-      <WorkoutEntry />
-      <Choice label="Open routine" onPress={() => router.navigate("/routine")} />
 
-    </View>
-    <View style={s.card}>
-      <View style={s.row}><Text style={[s.heading, s.grow]}>Reminders</Text><Switch accessibilityLabel="Enable reminders" value={store.reminders.enabled} disabled={!controls.available || controls.busy} onValueChange={(value) => void controls.enable(value)} thumbColor="#ffffff" trackColor={{ false: colors.border, true: store.accent }} style={s.switch} /></View>
-      <Text style={s.muted}>Local reminders for the next 28 days. Opening FitMap refreshes your schedule. A final reminder asks you to reopen FitMap before the window ends.</Text>
-      {!controls.available && <Text style={s.muted}>Reminders require the updated native app.</Text>}
-      {controls.available && controls.permission !== "granted" && controls.permission !== "denied" && <Action label="Enable notifications" disabled={controls.busy} onPress={() => void controls.enable(true)} />}
-      {controls.permission === "denied" && <><Text style={s.body}>Turn on notifications in Android Settings, Apps, FitMap, Notifications</Text><Choice label="Open notification settings" onPress={() => void Linking.openSettings()} /></>}
-      <View style={s.row}><Text style={[s.body, s.grow]}>Hide workout details in notifications</Text><Switch accessibilityLabel="Hide workout details in notifications" value={store.reminders.private} onValueChange={(value) => store.setReminders({ ...store.reminders, private: value })} thumbColor="#ffffff" trackColor={{ false: colors.border, true: store.accent }} style={s.switch} /></View>
-      <Action label="Send test notification" disabled={!controls.available || controls.permission !== "granted" || controls.busy} onPress={() => { setTestSent(false); void controls.test().then((sent) => setTestSent(!!sent)); }} />
-      {testSent && <Text accessibilityLiveRegion="polite" style={s.muted}>Test scheduled for about 5 seconds from now.</Text>}
-      {controls.error && <><Text accessibilityRole="alert" style={s.error}>{controls.error}</Text><Choice label="Retry reminders" onPress={controls.retry} /></>}
-    </View>
-    <Text style={s.heading}>Your week</Text><Text style={s.muted}>Add exercises to each day using the body model.</Text>
-    {[0, 1, 2, 3, 4, 5, 6].map((day) => {
-      const item = store.schedule[day], label = WEEKDAYS[day];
-      const entries=dayExercises(store.routine,day);
-      return <View key={day} testID={`plan-day-${day}`} onLayout={event=>{positions.current[day]=event.nativeEvent.layout.y;}} style={s.card}>
-        <View style={s.row}><Text style={[s.heading,s.grow]}>{label}</Text><Switch accessibilityLabel={`${label} workout`} value={item.on} onValueChange={on=>store.setDayPlan(day,{...item,on})} trackColor={{true:store.accent}} style={s.switch}/></View>
-        {item.on ? <TimePicker day={label} plan={item} onChange={value=>store.setDayPlan(day,value)}/> : <Text style={s.muted}>Rest day</Text>}
-        {[...new Set(entries.map(e=>e.muscle))].map(muscle=><Text key={muscle} style={s.body}>{muscle}: {entries.filter(e=>e.muscle===muscle).map(e=>e.name).join(", ")}</Text>)}
-        {entries.map(e=><View key={e.id} style={s.row}><Text style={[s.body,s.grow]}>{e.name}</Text><Choice label={`Remove ${e.name} from ${label}`} onPress={()=>{store.assignDay(e.id,day,false);ux.notify(`Removed from ${label}`,"Undo",()=>{store.assignDay(e.id,day,true);if(!item.on)store.setDayPlan(day,item);});}}/></View>)}
-        <Choice label={`Add exercises to ${label}`} onPress={()=>addToDay(day)}/>
-      </View>;
-    })}
-    <Text style={s.muted}>For general fitness information only.</Text>
-  </GuideScrollView>}</SafeAreaView>;
+export default function PlanScreen() {
+  const store = useFitMap(), controls = useReminderControls(), ux = useExperience(), path = usePathname();
+  const [now, setNow] = useState(() => new Date()), [offset, setOffset] = useState(0), [selected, setSelected] = useState(() => weekday(new Date()));
+  const [sheet, setSheet] = useState<"reminders" | "menu" | "copy" | "clear" | null>(null), [copyTo, setCopyTo] = useState<number | null>(null), [testSent, setTestSent] = useState(false);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null), detailY = useRef(0);
+  useEffect(() => { const tick = () => setNow(new Date()); const timer = setInterval(tick, 1000), sub = AppState.addEventListener("change", tick); return () => { clearInterval(timer); sub.remove(); }; }, []);
+  const returnDay = store.returnWeekday;
+  const returnKey = `${path}:${returnDay}`, [lastReturn, setLastReturn] = useState(returnKey);
+  if (lastReturn !== returnKey) { setLastReturn(returnKey); if(path === "/plan" && returnDay !== null) { setSelected(returnDay); setOffset(0); } }
+  useEffect(() => { if (path !== "/plan" || returnDay === null) return; const timer = setTimeout(() => scroll.current?.scrollTo({ y: detailY.current, animated: !ux.reducedMotion }), 150); return () => clearTimeout(timer); }, [path, returnDay, ux.reducedMotion]);
+  const entry = todayCard({ ...store, now }), dates = weekDates(now, offset), date = dates[selected], items = dayExercises(store.routine, selected), plan = store.schedule[selected];
+  const add = (day: number) => { store.beginDay(day); router.navigate("/"); };
+  const start = (all = false) => { store.startWorkout(all ? store.routine : entry.exercises); ux.mark("start"); router.navigate("/workout"); };
+  const viewSummary = () => router.navigate({ pathname: "./history", params: { session: entry.latest?.id } });
+  const next = planReminders({ now, routine: store.routine, schedule: store.schedule, history: store.history, skips: store.skips, prefs: store.reminders })[0];
+  const reason = !controls.available ? "Notifications unavailable in this app build" : controls.permission === "denied" ? "Notifications blocked" : !store.reminders.enabled ? "Reminders are off" : controls.permission !== "granted" ? "Notification permission needed" : null;
+  const elapsed = store.workout ? Math.max(0, Math.floor((+now - store.workout.startedAt) / 1000)) : 0;
+  const title = entry.kind === "running" ? "Workout in progress" : entry.kind === "done" ? "Done today" : entry.kind === "planned" ? dayLabel(store.routine, entry.day) : "Nothing planned today";
+  return <SafeAreaView style={s.screen} edges={["left", "right"]}><View style={{ padding: 16, gap: 6 }}><Text style={s.title}>Plan</Text><Text style={s.muted}>Start today&apos;s workout or choose a day to edit.</Text></View>
+    <GuideScrollView scrollRef={scroll} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+      {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
+      <View style={s.card}><Text style={s.eyebrow}>TODAY</Text><Text style={s.heading}>{title}</Text>
+        {entry.kind === "running" && store.workout && <Text style={s.body}>{[...new Set(store.workout.exercises.map(e => e.muscle))].join(" + ")} &middot; {completedSets(store.workout)} of {store.workout.exercises.reduce((n,e) => n + e.sets, 0)} sets &middot; {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2,"0")}</Text>}
+        {entry.kind === "done" && <Text style={s.body}>{entry.minutes} min &middot; {entry.sessions} {entry.sessions === 1 ? "session" : "sessions"}</Text>}
+        {entry.kind === "planned" && <Text style={s.body}>{entry.planned.length} {entry.planned.length === 1 ? "exercise" : "exercises"}</Text>}
+        {entry.kind === "empty" && <Text style={s.body}>Add a workout from the body model</Text>}
+        <GuideTarget name="start"><Action label={entry.kind === "running" ? "Resume workout" : entry.kind === "done" ? "View summary" : entry.kind === "planned" ? "Start workout" : "Add workout"} onPress={() => entry.kind === "done" ? viewSummary() : entry.kind === "empty" ? add(entry.day) : start()} /></GuideTarget>
+        {entry.kind === "done" && store.routine.length > 0 && <Choice label="Start another workout" onPress={() => start()}/>}
+        {entry.kind === "empty" && store.routine.length > 0 && <Choice label="Start from all exercises" onPress={() => start(true)}/>}
+        {entry.kind === "planned" && <Choice label="Edit today" onPress={() => { setOffset(0); setSelected(entry.day); scroll.current?.scrollTo({ y: detailY.current, animated: !ux.reducedMotion }); }}/>}
+      </View>
+      <View style={{ gap: 8 }}><Text style={s.muted}>{reason ?? (next ? `Next reminder: ${next.date.toLocaleDateString(undefined,{weekday:"short"})} ${store.schedule[weekday(next.date)].time} \u00b7 ${dayLabel(store.routine, weekday(next.date))}` : "No upcoming reminders. Add exercises and turn on Remind me for a day.")}</Text><Choice label={reason ? "Set up reminders" : "Reminders - On"} onPress={() => setSheet("reminders")}/></View>
+      <View style={s.row}><Text style={[s.heading, s.grow]}>Week of {dates[0].toLocaleDateString(undefined,{day:"numeric",month:"short"})}</Text><Choice label="Previous week" onPress={() => setOffset(offset - 1)}/><Choice label="Next week" onPress={() => setOffset(offset + 1)}/></View>
+      <ScrollView horizontal contentContainerStyle={{ gap: 4 }} accessibilityLabel="Week dates">{dates.map((d, i) => { const key = localDate(d), done = store.history.some(h => localDate(new Date(h.endedAt)) === key), today = key === localDate(now), planned = store.schedule[i].on && dayExercises(store.routine,i).length > 0; return <Pressable key={key} accessibilityRole="button" accessibilityLabel={`${DAYS[i]} ${d.toLocaleDateString()}, ${done ? "done" : planned ? "planned" : "rest"}${today ? ", today" : ""}`} accessibilityState={{ selected: selected === i }} onPress={() => setSelected(i)} style={{ minWidth: 44, minHeight: 80, padding: 6, gap: 5, alignItems: "center", borderRadius: 14, borderWidth: today ? 2 : 1, borderColor: today ? store.accent : colors.border, backgroundColor: selected === i ? store.accent : colors.surface }}><Text style={{ color: selected === i ? colors.background : colors.text }}>{DAYS[i].slice(0,1)}</Text><Text style={{ color: selected === i ? colors.background : colors.text, fontWeight: "700" }}>{d.getDate()}</Text><Text style={{ color: selected === i ? colors.background : colors.muted }}>{done ? "\u2713" : planned ? "\u25cf" : key < localDate(now) ? " " : "\u25cb"}</Text></Pressable>; })}</ScrollView>
+      <View testID={`plan-day-${selected}`} onLayout={event => { detailY.current = event.nativeEvent.layout.y; }} style={s.card}>
+        <View style={s.row}><Text style={[s.heading, s.grow]}>{date.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"short"})}</Text><Choice label="Day options" onPress={() => setSheet("menu")}/></View>
+        <Text style={s.muted}>{items.length ? dayLabel(store.routine, selected) : "Rest day"}</Text>
+        {!!items.length && <><View style={s.row}><Text style={[s.body, s.grow]}>Remind me</Text><Switch accessibilityLabel="Remind me" value={plan.on} onValueChange={on => store.setDayPlan(selected,{...plan,on})} thumbColor="#ffffff" trackColor={{ false: colors.border, true: store.accent }}/></View><TimePicker day={DAYS[selected]} plan={plan} onChange={p => store.setDayPlan(selected,p)}/></>}
+        {!items.length && <Text style={s.body}>No exercises yet</Text>}
+        {items.map(e => <DayExercise key={`${selected}:${e.id}`} exercise={e} day={selected}/>)}
+        <Choice label="+ Add exercises" onPress={() => add(selected)}/>
+      </View>
+    </GuideScrollView>
+    <Modal visible={sheet !== null} transparent animationType="none" onRequestClose={() => {setSheet(null);setCopyTo(null);}}><View style={s.overlay}><View style={[s.card, s.dialog, {maxHeight:"90%"}]}><ScrollView contentContainerStyle={{ gap: 12 }}>
+      {sheet === "reminders" && <><Text style={s.heading}>Reminders</Text><View style={s.row}><Text style={[s.body,s.grow]}>Enable reminders</Text><Switch accessibilityLabel="Enable reminders" value={store.reminders.enabled} disabled={!controls.available || controls.busy} onValueChange={value => void controls.enable(value)} thumbColor="#fff" trackColor={{false:colors.border,true:store.accent}}/></View><Text style={s.muted}>{controls.available ? `Permission: ${controls.permission}` : "Install the updated FitMap app to use notifications."}</Text>{controls.permission === "denied" && <Choice label="Open notification settings" onPress={() => void Linking.openSettings()}/>}<View style={s.row}><Text style={[s.body,s.grow]}>Hide workout details</Text><Switch accessibilityLabel="Hide workout details" value={store.reminders.private} onValueChange={value => store.setReminders({...store.reminders, private:value})} thumbColor="#fff" trackColor={{false:colors.border,true:store.accent}}/></View><Choice label="Send test notification" onPress={() => { if(controls.available && controls.permission === "granted") void controls.test().then(sent => setTestSent(!!sent)); }}/>{testSent && <Text style={s.muted}>Test notification will arrive shortly.</Text>}{controls.error && <Text style={s.error}>{controls.error}</Text>}</>}
+      {sheet === "menu" && <><Text style={s.heading}>{DAYS[selected]} options</Text><Choice label="Copy this day to..." onPress={() => setSheet("copy")}/><Choice label="Clear day" destructive onPress={() => setSheet("clear")}/></>}
+      {sheet === "copy" && <><Text style={s.heading}>Copy {DAYS[selected]} to...</Text><Text style={s.muted}>Replace the selected day&apos;s exercises and reminder time. Exercise weights and reps are shared across days.</Text>{DAYS.map((name, i) => i !== selected && <Choice key={name} label={name} active={copyTo === i} onPress={() => setCopyTo(i)}/>)}{copyTo !== null && <Action label={`Replace ${DAYS[copyTo]} plan`} onPress={() => { store.copyDay(selected,copyTo); setSheet(null);setCopyTo(null);ux.notify("Day copied"); }}/>}</>}
+      {sheet === "clear" && <><Text style={s.heading}>Clear {DAYS[selected]}?</Text><Text style={s.body}>Remove its exercises and turn off its reminder. Other days and workout history stay unchanged.</Text><Choice label="Confirm clear day" destructive onPress={() => {store.clearPlanDay(selected);setSheet(null);}}/></>}
+      <Choice label="Done" onPress={() => {setSheet(null);setCopyTo(null);}}/>
+    </ScrollView></View></View></Modal>
+  </SafeAreaView>;
 }
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background }, content: { padding: 20, gap: 16, paddingBottom: 32 },

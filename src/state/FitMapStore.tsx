@@ -1,3 +1,4 @@
+import { copyDay } from "../shared/plan-layout";
 import { finishSession, historyLog, lastExerciseLog, validateHistory } from "../shared/sessions";
 import { completedSets, newWorkout, toggleSet, progressRoutine, adjustRest, editWorkoutExercise, remainingSets } from "../shared/workout";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -23,6 +24,8 @@ export const colors = {
 };
 
 type Store = State & {
+  copyDay: (source: number, destination: number) => void;
+  clearPlanDay: (day: number) => void;
   targetWeekday: number | null;
   returnWeekday: number | null;
   beginDay: (day: number) => void;
@@ -109,6 +112,8 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
     <Context.Provider
       value={{
         ...state,
+        copyDay: (source, destination) => setState(old => ({ ...old, ...copyDay(old.routine, old.schedule, source, destination) })),
+        clearPlanDay: day => setState(old => ({ ...old, routine: old.routine.map(e => ({ ...e, days: e.days.filter(d => d !== day) })), schedule: old.schedule.map((p,i) => i === day ? { ...p, on: false } : p) })),
         targetWeekday, returnWeekday,
         beginDay: (day) => { if(Number.isInteger(day)&&day>=0&&day<7){setTargetWeekday(day);setReturnWeekday(null);} },
         endDay: () => {setReturnWeekday(targetWeekday);setTargetWeekday(null);},

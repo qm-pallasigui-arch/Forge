@@ -4,10 +4,12 @@ import { colors, useFitMap } from "../state/FitMapStore";
 export function Choice({
   label,
   active,
+  destructive,
   onPress,
 }: {
   label: string;
   active?: boolean;
+  destructive?: boolean;
   onPress: () => void;
 }) {
   const { accent } = useFitMap();
@@ -23,7 +25,7 @@ export function Choice({
         pressed && { opacity: 0.7 },
       ]}
     >
-      <Text style={[s.label, active && { color: "#101215", fontWeight: "700" }]}>{label}</Text>
+      <Text style={[s.label, destructive && { color: "#ff9687" }, active && { color: "#101215", fontWeight: "700" }]}>{label}</Text>
     </Pressable>
   );
 }
