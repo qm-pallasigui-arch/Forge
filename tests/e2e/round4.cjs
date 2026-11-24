@@ -1,0 +1,40 @@
+const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), assert = require('node:assert/strict');
+require('../register.cjs');
+const { initial } = require('../../src/state/persistence.ts');
+const { weekday } = require('../../src/shared/sessions.ts');
+const { chromium } = require(process.env.PLAYWRIGHT_PATH || 'playwright');
+const root = path.resolve('../.tmp/round4-web'), qa = path.resolve('../.tmp/round4-qa'); fs.mkdirSync(qa, {recursive:true});
+const server = http.createServer((req,res) => {let f=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!f.startsWith(root+path.sep)&&f!==root){res.writeHead(403);return res.end();}if(!fs.existsSync(f)||fs.statSync(f).isDirectory())f=path.join(root,'index.html');res.setHeader('Content-Type',f.endsWith('.js')?'application/javascript':f.endsWith('.css')?'text/css':'text/html');fs.createReadStream(f).pipe(res);});
+(async()=>{await new Promise(r=>server.listen(8097,'127.0.0.1',r));for(const width of [360,390]) {
+  const profile=fs.mkdtempSync(path.join(qa,'profile-'));let ctx,p;const errors=[];
+  const open=async()=>{ctx=await chromium.launchPersistentContext(profile,{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,viewport:{width,height:width===360?800:844},reducedMotion:'reduce'});p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto('http://127.0.0.1:8097/plan');};
+  const button=name=>p.getByRole('button',{name,exact:typeof name==='string'}).and(p.locator(':not([inert] *)'));
+  const tab=name=>p.getByRole('tab',{name:new RegExp(name)});
+  const state=()=>p.evaluate(()=>JSON.parse(localStorage.getItem('fitmap.state.v2')));
+  const snap=async name=>{if(await button('Dismiss message').count())await button('Dismiss message').click();await p.screenshot({path:path.join(qa,`${name}-${width}.png`)});};
+  const large=()=>p.addStyleTag({content:'[dir="auto"] {font-size:28px !important;line-height:1.35 !important;}'});
+  try {
+    await open(); await p.getByTestId('guide-card').waitFor(); await button('Skip').click();
+    await p.getByText('Nothing planned today',{exact:true}).waitFor(); await snap('plan-empty');
+    assert.equal(await tab('Routine').count(),0); assert.equal(await tab('History').count(),1);
+    const day=weekday(new Date()), seed={...initial,routine:[{id:'bench-press',name:'Bench Press',muscle:'Chest',equipment:'Barbell',sets:3,reps:8,weight:15,progression:2.5,days:[day]}],schedule:initial.schedule.map((s,i)=>({...s,on:i===day}))};
+    await p.evaluate(seed=>{localStorage.setItem('fitmap.state.v2',JSON.stringify(seed));localStorage.setItem('fitmap.history.v1','[]');},seed);await p.reload();await button('Start workout').waitFor();await snap('plan');
+    await button('Set up reminders').click();await snap('reminders');await button('Done').click();await tab('Body').click();await snap('body');await button('Settings').click();await snap('settings');await button('Done').click();await tab('Plan').click();await button('Next week').click();await button('Previous week').click();
+    await button('Edit today').click();await button('Edit Bench Press').click();await button('Increase Reps').click();await p.waitForFunction(()=>JSON.parse(localStorage.getItem('fitmap.state.v2')).routine[0].reps===9);
+    await snap('day-detail');await button('Remove Bench Press').click();await button('Confirm remove').click();await button('Undo').click();await p.waitForFunction(day=>JSON.parse(localStorage.getItem('fitmap.state.v2')).routine[0].days.includes(day),day);
+    await button('Day options').click();await button('Copy this day to...').click();const destination=(day+1)%7;await button(['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][destination]).click();await button(/^Replace .* plan$/).click();await p.waitForFunction(destination=>JSON.parse(localStorage.getItem('fitmap.state.v2')).routine[0].days.includes(destination),destination);
+    await button('Start workout').click();await button('Complete set 1').waitFor();await snap('workout');
+    await button(/^Finish workout/).click();await p.getByText('Nothing logged. Discard this workout instead?',{exact:true}).waitFor();await button('Keep going').click();
+    await button('Complete set 1').click();await p.getByTestId('rest-bar').waitFor();await p.getByRole('checkbox',{name:'Bench Press, set 1 of 3, done',exact:true}).click();assert.equal(await p.getByTestId('rest-bar').count(),0);
+    await button('+ Add exercise').click();await p.getByText("Adding to today's workout",{exact:true}).waitFor();await button(/Choose muscle by name/).click();await button('Chest').click();await button('Hide muscle list').click();await button('Expand Chest exercises').click();await button('Add Cable Fly').click();await p.getByText('1 added',{exact:true}).waitFor();await snap('picker');await button('Done').click();
+    await p.waitForFunction(()=>JSON.parse(localStorage.getItem('fitmap.state.v2')).workout.exercises.length===2);let saved=await state();assert.deepEqual(saved.workout.exercises.map(e=>e.id),['bench-press','cable-fly']);assert.equal(saved.routine.length,1);const sessionId=saved.workout.id;
+    await ctx.close();await open();await button('Resume workout').click();assert.equal((await state()).workout.id,sessionId);
+    await button('Complete set 1').click();await button('Skip rest').click();await button('Complete set 2').click();await button('Skip rest').click();await button('Complete set 3').click();await button('Skip rest').click();
+    await button('Complete set 1').click();await button('Skip rest').click();await button('Complete set 2').click();await button('Skip rest').click();await button('Complete set 3').click();assert.equal(await p.getByTestId('rest-bar').count(),0);
+    await button(/^Finish workout/).click();await button('Confirm finish').click();await p.getByText('Workout complete',{exact:true}).waitFor();await snap('finish');await button('Back to Plan').click();await p.getByText('Done today',{exact:true}).waitFor();await snap('plan-done');
+    await button('View summary').click();await button('Repeat this workout').waitFor();await snap('history-detail');await button('Back to history').click();await snap('history');await large();await snap('history-large');assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+    await tab('Plan').click();await snap('plan-large');await button('Start another workout').click();await button('Complete set 1').waitFor();await snap('workout-large');await button('Use again').click();await button('+ Add exercise').click();await button(/Choose muscle by name/).click();await button('Chest').click();await button('Hide muscle list').click();await button('Expand Chest exercises').click();await p.getByRole('switch',{name:'Also add to today plan',exact:true}).click();await button('Add Cable Fly').click();await snap('picker-large');await button('Done').click();await p.waitForFunction(day=>JSON.parse(localStorage.getItem('fitmap.state.v2')).routine.some(e=>e.id==='cable-fly'&&e.days.includes(day)),day);await button('Workout menu').click();await button('Discard workout').click();await button('Confirm discard').click();
+    await tab('Body').click();await button('Settings').click();await button('Backup and restore').waitFor();await snap('settings-large');await p.getByRole('radio',{name:'Blueprint',exact:true}).click();await button('Done').click();await p.waitForFunction(()=>JSON.parse(localStorage.getItem('fitmap.state.v2')).theme==='blueprint');
+    assert.deepEqual(errors,[]);console.log(`PASS ${width}: Plan states/dates/edit/undo/copy; model session-only add; cold restart; set undo/rest/final-set; history; theme; large-text proxy`);
+  } catch(e) {if(p){console.error('PAGE',p.url(),await p.locator('body').innerText());await snap('failure');}throw e;} finally {if(ctx)await ctx.close();}
+}server.close();})().catch(e=>{console.error(e);server.close();process.exit(1);});

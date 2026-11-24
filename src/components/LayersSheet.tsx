@@ -2,22 +2,23 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useExperience } from "../state/Experience";
-import { colors, useFitMap } from "../state/FitMapStore";
+import { accents, colors, useFitMap } from "../state/FitMapStore";
 import { Choice } from "./Controls";
 
-export default function LayersSheet({ depth, setDepth, onClose }: { depth: boolean; setDepth: (value: boolean) => void; onClose: () => void }) {
+export default function LayersSheet({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets(), store = useFitMap(), ux = useExperience();
   return <Modal transparent animationType="none" onRequestClose={onClose}>
     <View style={s.overlay}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close layers" accessibilityRole="button" />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close settings" accessibilityRole="button" />
       <View accessibilityViewIsModal style={[s.sheet, { paddingBottom: Math.max(20, insets.bottom) }]}>
-        <View style={s.header}><Text style={s.title}>Menu</Text><Choice label="Done" onPress={onClose} /></View>
+        <View style={s.header}><Text style={s.title}>Settings</Text><Choice label="Done" onPress={onClose} /></View>
         <ScrollView contentContainerStyle={{ gap: 16 }}>
-          <Choice label="Backup and restore" onPress={() => { onClose(); router.navigate("/backup"); }} />
-          <Text style={s.label}>Body view</Text>
-          <View style={s.row}><Choice label="Illustration" active={!depth} onPress={() => setDepth(false)} /><Choice label="Depth view" active={depth} onPress={() => setDepth(true)} /></View>
-          <Text style={s.detail}>Depth view: drag to rotate a layered version of the illustration.</Text>
-        <Text style={s.label}>Theme: {store.theme}</Text><Choice label="Change theme" onPress={store.cycleTheme} /><Choice label="Replay guide" onPress={() => { ux.replay(); onClose(); }} /></ScrollView>
+          <Text style={s.label}>Appearance</Text>
+          <View style={s.row}>{(["classic", "blueprint", "neon"] as const).map(theme => <Pressable key={theme} accessibilityRole="radio" accessibilityLabel={theme[0].toUpperCase() + theme.slice(1)} accessibilityState={{checked: store.theme === theme}} aria-checked={store.theme === theme} onPress={() => store.setTheme(theme)} style={[s.option, {minHeight:44, flexDirection:"row", alignItems:"center", borderColor: store.theme === theme ? store.accent : colors.border}]}><View style={{width:18,height:18,borderRadius:9,backgroundColor:accents[theme]}}/><Text style={s.label}>{theme[0].toUpperCase()+theme.slice(1)}{store.theme === theme ? " \u2713" : ""}</Text></Pressable>)}</View>
+          <Text style={s.label}>Data</Text><Choice label="Backup and restore" onPress={() => { onClose(); router.navigate("/backup"); }} />
+          <Text style={s.label}>Help</Text><Choice label="Replay guide" onPress={() => { ux.replay(); onClose(); }} />
+          <Text style={s.label}>About</Text><Text style={s.detail}>For general fitness information only.</Text>
+        </ScrollView>
       </View>
     </View>
   </Modal>;

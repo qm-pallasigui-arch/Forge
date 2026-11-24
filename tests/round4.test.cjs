@@ -8,7 +8,8 @@ const { insertSessionExercise } = require('../src/shared/session-picker.ts');
 const e = { id:'bench',name:'Bench Press',muscle:'Chest',equipment:'Barbell',sets:3,reps:8,weight:15,progression:2.5,days:[0] };
 test('Today card precedence: running, done, planned, nothing planned', () => {
   const now = new Date(2026,10,23,12), base = {...initial,now,routine:[e]}, planned = {...base,schedule:base.schedule.map((p,i)=>({...p,on:i===0}))};
-  assert.equal(todayCard(base).kind,'empty');
+  assert.equal(todayCard({...base,routine:[{...e,days:[]}]}).kind,'empty');
+  assert.equal(todayCard(base).kind,'planned'); // Remind me off never hides assigned exercises.
   assert.equal(todayCard(planned).kind,'planned');
   const w = newWorkout([e],+now), h = finishSession(toggleSet(w,e.id,0,+now),+now+100);
   const done = {...base,history:[h],routine:[]};

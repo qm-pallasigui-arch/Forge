@@ -95,7 +95,7 @@ export function ExperienceSurface({ children }: { children: ReactNode }) {
     {ux.error && <Text accessibilityRole="alert" style={s.text}>{ux.error}</Text>}
     <View style={{ flex: 1 }}>{children}</View>
     {ux.toast && <View accessibilityLiveRegion="polite" style={s.toast}><Text style={[s.text, { flex: 1 }]}>{ux.toast.message}</Text>{ux.toast.action && <Pressable accessibilityRole="button" onPress={() => { ux.toast?.run?.(); ux.setToast(null); }} style={s.button}><Text style={[s.title, { color: store.accent }]}>{ux.toast.action}</Text></Pressable>}<Pressable accessibilityRole="button" accessibilityLabel="Dismiss message" onPress={() => ux.setToast(null)} style={s.button}><Text style={s.text}>Close</Text></Pressable></View>}
-    {active && <SafeAreaView edges={["bottom"]} style={s.guide} testID="guide-card"><View style={{ flex: 1 }}><Text style={[s.title, { color: store.accent }]}>{step ? `Build your first workout / ${ux.guide.completed.length}/3` : "You're set"}</Text><Text style={s.text}>{step ? message : "Your workout is ready. You can replay this guide from Menu."}</Text></View><Pressable accessibilityRole="button" onPress={step ? ux.skip : ux.dismiss} style={s.button}><Text style={s.text}>{step ? "Skip" : "Dismiss"}</Text></Pressable></SafeAreaView>}
+    {active && <SafeAreaView edges={["bottom"]} style={s.guide} testID="guide-card"><View style={{ flex: 1 }}><Text style={[s.title, { color: store.accent }]}>{step ? `Build your first workout / ${ux.guide.completed.length}/3` : "You're set"}</Text><Text style={s.text}>{step ? message : "Your workout is ready. You can replay this guide from Settings."}</Text></View><Pressable accessibilityRole="button" onPress={step ? ux.skip : ux.dismiss} style={s.button}><Text style={s.text}>{step ? "Skip" : "Dismiss"}</Text></Pressable></SafeAreaView>}
   </SafeAreaView>;
 }
 const s = StyleSheet.create({
@@ -103,6 +103,6 @@ const s = StyleSheet.create({
   guide: { backgroundColor: colors.raised, padding: 12, flexDirection: "row", gap: 8, alignItems: "center" },
   title: { fontSize: 12, fontWeight: "700" }, text: { color: colors.text, fontSize: 12, lineHeight: 18 },
   button: { minWidth: 44, minHeight: 44, justifyContent: "center", alignItems: "center", paddingHorizontal: 8 },
-  resume: { minHeight: 44, justifyContent: "center", alignItems: "center" },
+  resume: { borderWidth: 1, borderColor: colors.border, borderRadius: 14, margin: 6, paddingHorizontal: 10, minHeight: 44, justifyContent: "center", alignItems: "center" },
   toast: { backgroundColor: "#252b35", borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 10, flexDirection: "row", alignItems: "center", gap: 4 },
 });

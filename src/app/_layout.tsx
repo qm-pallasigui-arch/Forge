@@ -37,7 +37,7 @@ function Navigation() {
             tabBarIcon: ({ color }) => <TabIcon name="body" color={color} />,
           }}
         />
-        <Tabs.Screen name="plan" options={{ title: "Plan", tabBarBadge: store.workout ? " " : undefined, tabBarIcon: ({ color }) => <TabIcon name="plan" color={color} /> }} />
+        <Tabs.Screen name="plan" options={{ title: "Plan", tabBarIcon: ({ color }) => <View><TabIcon name="plan" color={color} />{store.workout && <View accessibilityLabel="Workout in progress" style={{position:"absolute",right:-5,top:-3,width:8,height:8,borderRadius:4,backgroundColor:store.accent}}/>}</View> }} />
         <Tabs.Screen name="history" options={{ title: "History", tabBarIcon: ({ color }) => <TabIcon name="history" color={color} /> }} />
         <Tabs.Screen name="routine" options={{ tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />
         <Tabs.Screen name="workout" options={{ tabBarStyle: { display: "none" }, tabBarButton: () => null, tabBarItemStyle: { display: "none" } }} />

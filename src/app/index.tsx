@@ -24,6 +24,7 @@ export default function BodyScreen({ picker }: { picker?: SessionPicker } = {}) 
   useEffect(()=>{if (picker) return; if(target===null || path!=="/")return;const sub=BackHandler.addEventListener("hardwareBackPress",()=>{doneDay();return true;});return()=>sub.remove();});
   const [angle, setAngle] = useState(0), [depth, setDepth] = useState(true), [browse, setBrowse] = useState(false), [layers, setLayers] = useState(false);
   const [selected, setSelected] = useState<{ id: string; view: BodyView } | null>(null), [expanded, setExpanded] = useState(false), [part, setPart] = useState<string | null>(null);
+  const [pickerHeight, setPickerHeight] = useState(0);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [targetCamera, setTargetCamera] = useState({ zoom: 1, x: 0, y: 0 });
   const [animatedCamera, setCamera] = useState(targetCamera), cameraRef = useRef(animatedCamera), blurTarget = useRef<ComponentRef<typeof View>>(null);
@@ -50,13 +51,14 @@ export default function BodyScreen({ picker }: { picker?: SessionPicker } = {}) 
   const pin = projectAnchor(...anchor, size.width, size.height, depth ? angle : view === "back" ? 180 : 0, camera.zoom, camera.x, camera.y);
   const lower = anchor[1] >= 490;
   const card = placeCard(size.height * (lower ? 0.64 : 0.3), size.height, lower, expanded);
+  const fullPicker = !!picker && expanded && size.height < 360;
   const pinVisible = selected?.view === view && Math.abs(Math.cos(angle * Math.PI / 180)) > 0.08 && pin.x >= 0 && pin.x <= size.width && pin.y >= 0 && pin.y <= size.height;
   const edge = card.below ? card.top : card.top + card.height;
   const hints: Partial<Record<Mode, string>> = { heatmap: "Brighter muscles have more planned sets x reps. Gray means no exercises.", recovery: "Recent shows time since an exercise was added or a workout logged: accent under 12 h, amber 12-36 h, green 36 h+.", constellation: "Connect links muscle groups with exercises in your routine. It does not show anatomical connections." };
   const hintKey = `mode-${mode}`;
   const showHint = mode !== "map" && (!ux.active || !ux.step) && ux.ready;
-  return <SafeAreaView style={s.screen} edges={["left", "right"]}>
-    <View style={s.header}><Text style={[s.logo, { color: store.accent }]}>FIT<Text style={{ color: colors.text }}>MAP</Text></Text>{!picker && target===null && <Choice label="Menu" onPress={() => setLayers(true)} />}</View>
+  return <SafeAreaView style={s.screen} edges={["left", "right"]}><View style={{flex:1}} pointerEvents={fullPicker ? "none" : "auto"} aria-hidden={fullPicker} accessibilityElementsHidden={fullPicker} importantForAccessibility={fullPicker ? "no-hide-descendants" : "auto"}>
+    <View style={s.header}><Text style={[s.logo, { color: store.accent }]}>FIT<Text style={{ color: colors.text }}>MAP</Text></Text>{!picker && target===null && <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={() => setLayers(true)} style={{minWidth:44,minHeight:44,alignItems:"center",justifyContent:"center",borderWidth:1,borderColor:colors.border,borderRadius:14}}><Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth={1.7}><Path d="M9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1z"/><Circle cx={12} cy={12} r={3}/></Svg></Pressable>}</View>
     {target!==null && <View style={[s.row,{paddingVertical:8,justifyContent:"space-between"}]}><Text style={{color:store.accent,fontWeight:"700",flexShrink:1}}>Adding to {DAYS[target]}</Text><Choice label="Done" onPress={doneDay} /></View>}
     {picker && <View style={[s.row,{paddingVertical:8,justifyContent:"space-between"}]}><View style={{flex:1}}><Text style={{color:colors.text,fontWeight:"700"}}>Adding to today&apos;s workout</Text><Text accessibilityLiveRegion="polite" style={s.hint}>{picker.added} added</Text></View><Choice label="Done" onPress={picker.onDone}/></View>}
     {store.error && <Text accessibilityRole="alert" style={s.error}>{store.error}</Text>}
@@ -64,6 +66,7 @@ export default function BodyScreen({ picker }: { picker?: SessionPicker } = {}) 
     {showHint && <OneTimeHint key={hintKey} name={hintKey} message={hints[mode] ?? ""}><View style={s.row}>{!store.routine.length && <Choice label="Add exercises" onPress={() => { store.setMode("map"); setBrowse(true); }} />}</View></OneTimeHint>}
     <TourTarget name="muscle"><Pressable accessibilityRole="button" accessibilityState={{ expanded: browse }} onPress={() => setBrowse(!browse)} style={s.browse}><Text style={s.browseLabel}>{browse ? "Hide muscle list" : "\u2637 Choose muscle by name"}</Text></Pressable></TourTarget>
     {browse && <View><View style={s.row}><Choice label="Show front muscles" active={view === "front"} onPress={() => turn("front")} /><Choice label="Show back muscles" active={view === "back"} onPress={() => turn("back")} /></View><ScrollView horizontal style={s.names} contentContainerStyle={{ gap: 7 }}>{ids.map((id) => <Choice key={id} label={names[id]} onPress={() => pick(id, view)} />)}</ScrollView></View>}
+    <View style={[s.row,{justifyContent:"center",paddingVertical:6}]}><Choice label="Illustration" active={!depth} onPress={()=>{setDepth(false);setAngle(view === "front" ? 0 : 180);}}/><Choice label="Depth view" active={depth} onPress={()=>setDepth(true)}/></View>
     <TourTarget name="figure" style={s.figure}>
       <View style={s.canvas} onLayout={(event) => { const { width, height } = event.nativeEvent.layout; if (size.width !== width || size.height !== height) { setSize({ width, height }); setTargetCamera(selected ? focusCamera(...anchors[selected.id], width, height, angle) : { zoom: 1, x: 0, y: 0 }); } }}>
         <BlurTargetView ref={blurTarget} style={StyleSheet.absoluteFill}>
@@ -75,15 +78,17 @@ export default function BodyScreen({ picker }: { picker?: SessionPicker } = {}) 
             <Circle cx={size.width / 2} cy={edge} r={4} fill={store.accent} />
           </Svg>
           {pinVisible && <View testID="muscle-pin" pointerEvents="none" style={{ position: "absolute", left: pin.x - 12, top: pin.y - 12 }}><Pulse size={24} /><View style={{ position: "absolute", left: 9, top: 9, width: 6, height: 6, borderRadius: 3, backgroundColor: "white" }} /></View>}
-          <ExerciseSheet picker={picker} key={`${selected.view}:${selected.id}`} {...selected} onClose={clear} top={card.top} height={card.height} expanded={expanded} onExpand={() => setExpanded(!expanded)} blurTarget={blurTarget} part={part} setPart={setPart} />
+          {!fullPicker && <ExerciseSheet picker={picker} key={`${selected.view}:${selected.id}`} {...selected} onClose={clear} top={card.top} height={card.height} expanded={expanded} onExpand={() => setExpanded(!expanded)} blurTarget={blurTarget} part={part} setPart={setPart} />}
         </>}
       </View>
     </TourTarget>
     {!picker && target===null && <WorkoutEntry pill />}
     <Text style={s.hint}>Tap a muscle to see exercises</Text>
     <View style={s.center}>{(["front", "back"] as const).map((side) => <Choice key={side} label={side === "front" ? "Front" : "Back"} active={view === side} onPress={() => turn(side)} />)}</View>
-    <Text style={s.disclaimer}>For general fitness information only.</Text>
-    {layers && <LayersSheet depth={depth} setDepth={(value) => { setDepth(value); if (!value) setAngle(view === "front" ? 0 : 180); }} onClose={() => setLayers(false)} />}
+
+    {layers && <LayersSheet onClose={() => setLayers(false)} />}
+    </View>
+    {fullPicker && picker && selected && <View accessibilityViewIsModal style={[StyleSheet.absoluteFill,{backgroundColor:colors.background,padding:12}]}><View style={[s.row,{justifyContent:"space-between",paddingBottom:8}]}><View style={{flex:1}}><Text style={{color:colors.text,fontWeight:"700"}}>Adding to today&apos;s workout</Text><Text accessibilityLiveRegion="polite" style={s.hint}>{picker.added} added</Text></View><Choice label="Done" onPress={picker.onDone}/></View><View style={{flex:1}} onLayout={event=>setPickerHeight(event.nativeEvent.layout.height)}><ExerciseSheet picker={picker} {...selected} onClose={clear} top={0} height={pickerHeight} expanded onExpand={()=>setExpanded(false)} blurTarget={blurTarget} part={part} setPart={setPart}/></View></View>}
   </SafeAreaView>;
 }
 const s = StyleSheet.create({

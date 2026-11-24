@@ -57,6 +57,7 @@ type Store = State & {
   restore: (exercise: Exercise, index: number) => void;
   setNote: (key: string, note: string) => void;
   setMode: (mode: Mode) => void;
+  setTheme: (theme: Theme) => void;
   cycleTheme: () => void;
   setDayPlan: (day: number, plan: DayPlan) => void;
   setReminders: (prefs: ReminderPrefs) => void;
@@ -175,6 +176,7 @@ export function FitMapProvider({ children }: { children: ReactNode }) {
         setDayPlan: (day, plan) => setState((old) => ({ ...old, schedule: normalizeSchedule(old.schedule.map((item, index) => index === day ? plan : item)) })),
         setReminders: (reminders) => setState((old) => ({ ...old, reminders })),
         skipDay: (date) => setState((old) => ({ ...old, skips: normalizeSkips({ ...old.skips, [date]: true }) })),
+        setTheme: theme => setState(old => ({...old,theme})),
         cycleTheme: () =>
           setState((old) => ({
             ...old,

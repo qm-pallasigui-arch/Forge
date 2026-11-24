@@ -1,5 +1,11 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { ComponentProps } from "react";
+import { Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { colors, useFitMap } from "../state/FitMapStore";
+
+export function AppSwitch(props: ComponentProps<typeof Switch>) {
+  const { accent } = useFitMap();
+  return <Switch {...props} thumbColor="#ffffff" trackColor={{ false: colors.border, true: accent }} {...(Platform.OS === "web" ? { activeThumbColor: "#ffffff" } : {})} style={[{ minWidth: 48, minHeight: 44 }, props.style]} />;
+}
 
 export function Choice({
   label,
