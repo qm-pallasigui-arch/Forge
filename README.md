@@ -1,5 +1,5 @@
 
-# FitMap mobile
+[# FitMap mobile
 
 Native React Native screens, Expo Router navigation, SVG muscle selection, and local routine/notes storage. Android is the first test target; iOS configuration is also included.
 
